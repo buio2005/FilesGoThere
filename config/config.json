@@ -1,0 +1,39 @@
+{
+  "app": {
+    "language": "it",
+    "mode": "manual"
+  },
+  "watch": {
+    "paths": [
+      "C:/Users/boxbu/Downloads"
+    ],
+    "recursive": false,
+    "settle_seconds": 3.0
+  },
+  "library": {
+    "root": "C:/Users/boxbu/Downloads/Organizzati",
+    "create_folders": true,
+    "duplicate_strategy": "rename"
+  },
+  "rules": {
+    "by_extension": {
+      ".pdf": "Documenti/PDF",
+      ".docx": "Documenti/Word",
+      ".xlsx": "Documenti/Excel",
+      ".jpg": "Immagini",
+      ".png": "Immagini",
+      ".zip": "Archivi"
+    },
+    "default_folder": "Altro"
+  },
+  "logging": {
+  "level": "INFO",
+  "file": "C:/Users/boxbu/AppData/Local/FilesGoThere/logs/filesgothere.log",
+  "max_bytes": 1048576,
+  "backups": 3
+},
+  "queue": {
+  "enabled": true,
+  "file": "C:/Users/boxbu/AppData/Local/FilesGoThere/data/queue.jsonl"
+}
+}

@@ -1,0 +1,39 @@
+{
+  "app": {
+    "language": "it",
+    "mode": "auto"
+  },
+  "watch": {
+    "paths": [
+      "C:/Users/USER/Downloads"
+    ],
+    "recursive": false,
+    "settle_seconds": 2.0
+  },
+  "library": {
+    "root": "C:/Users/USER/Downloads/Organizzati",
+    "create_folders": true,
+    "duplicate_strategy": "rename"
+  },
+  "rules": {
+    "by_extension": {
+      ".pdf": "Documenti/PDF",
+      ".docx": "Documenti/Word",
+      ".xlsx": "Documenti/Excel",
+      ".jpg": "Immagini",
+      ".png": "Immagini",
+      ".zip": "Archivi"
+    },
+    "default_folder": "Altro"
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "logs/filesgothere.log",
+    "max_bytes": 1048576,
+    "backups": 3
+  },
+  "queue": {
+    "enabled": true,
+    "file": "data/queue.jsonl"
+  }
+}
