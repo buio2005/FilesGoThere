@@ -7,6 +7,11 @@ dependencies = [
   "watchdog>=4.0.0",
 ]
 
+[project.optional-dependencies]
+gui = [
+  "PySide6>=6.7.0",
+]
+
 [project.scripts]
 filesgothere = "filesgothere.cli:main"
 

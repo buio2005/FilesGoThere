@@ -1,0 +1,30 @@
+{
+  "app": {
+    "language": "it",
+    "mode": "manual"
+  },
+  "watch": {
+    "paths": [],
+    "recursive": false,
+    "settle_seconds": 1.0
+  },
+  "library": {
+    "root": "",
+    "create_folders": false,
+    "duplicate_strategy": "rename"
+  },
+  "rules": {
+    "by_extension": {},
+    "default_folder": "Altro"
+  },
+  "logging": {
+    "level": "INFO",
+    "file": "logs/filesgothere.log",
+    "max_bytes": 1048576,
+    "backups": 3
+  },
+  "queue": {
+    "enabled": true,
+    "file": "data/queue.jsonl"
+  }
+}

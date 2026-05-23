@@ -8,3 +8,9 @@ Offline. Lightweight. Privacy-friendly.
    - `pip install -r requirements.txt`
 3. Avvia:
    - `python main.py --config config/config.json`
+
+## Avvio (GUI minimale)
+1. Installa dipendenze GUI:
+   - `pip install -r requirements-gui.txt`
+2. Avvia:
+   - `python main.py gui --config config/config.json`
