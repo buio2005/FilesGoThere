@@ -1,19 +1,17 @@
 {
   "app": {
-    "language": "it",
+    "language": "en",
     "mode": "manual"
   },
   "watch": {
     "paths": [
-      "C:/Users/boxbu/Downloads",
-      "C:/Users/boxbu/Downloads/Organizzati",
-      "F:/LibreWolf_Downloads"
+      "C:/Users/boxbu/Downloads"
     ],
     "recursive": false,
     "settle_seconds": 3.0
   },
   "library": {
-    "root": "C:/Users/boxbu/Downloads/Organizzati",
+    "root": "",
     "create_folders": true,
     "duplicate_strategy": "rename"
   },
@@ -30,12 +28,12 @@
   },
   "logging": {
     "level": "INFO",
-    "file": "C:/Users/boxbu/AppData/Local/FilesGoThere/logs/filesgothere.log",
+    "file": "logs/filesgothere.log",
     "max_bytes": 1048576,
     "backups": 3
   },
   "queue": {
     "enabled": true,
-    "file": "C:/Users/boxbu/AppData/Local/FilesGoThere/data/queue.jsonl"
+    "file": "data/queue.jsonl"
   }
 }
