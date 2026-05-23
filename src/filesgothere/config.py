@@ -9,12 +9,16 @@ from typing import Any, Literal
 Language = Literal["it", "en"]
 Mode = Literal["auto", "manual"]
 DuplicateStrategy = Literal["rename", "skip", "overwrite"]
+Theme = Literal["light", "dark"]
 
 
 @dataclass(frozen=True)
 class AppConfig:
     language: Language = "it"
     mode: Mode = "auto"
+    theme: Theme = "light"
+    focus_on_startup: bool = False
+    focus_on_download_complete: bool = False
 
 
 @dataclass(frozen=True)
@@ -26,7 +30,7 @@ class WatchConfig:
 
 @dataclass(frozen=True)
 class LibraryConfig:
-    root: Path
+    root: Path | None
     create_folders: bool = True
     duplicate_strategy: DuplicateStrategy = "rename"
 
@@ -92,6 +96,13 @@ def _parse(raw: dict[str, Any], source_path: Path) -> RootConfig:
     if mode not in ("auto", "manual"):
         raise ConfigError("app.mode deve essere 'auto' o 'manual'")
 
+    theme = app_raw.get("theme", "light")
+    if theme not in ("light", "dark"):
+        raise ConfigError("app.theme deve essere 'light' o 'dark'")
+
+    focus_on_startup = bool(app_raw.get("focus_on_startup", False))
+    focus_on_download_complete = bool(app_raw.get("focus_on_download_complete", False))
+
     paths_raw = watch_raw.get("paths", [])
     if not isinstance(paths_raw, list):
         raise ConfigError("watch.paths deve essere una lista")
@@ -102,7 +113,12 @@ def _parse(raw: dict[str, Any], source_path: Path) -> RootConfig:
     if settle_seconds < 0.0:
         raise ConfigError("watch.settle_seconds deve essere >= 0")
 
-    library_root = Path(str(library_raw.get("root", ""))).expanduser()
+    raw_library_root = str(library_raw.get("root", "")).strip()
+    library_root: Path | None
+    if not raw_library_root or raw_library_root == ".":
+        library_root = None
+    else:
+        library_root = Path(raw_library_root).expanduser()
     duplicate_strategy = library_raw.get("duplicate_strategy", "rename")
     if duplicate_strategy not in ("rename", "skip", "overwrite"):
         raise ConfigError("library.duplicate_strategy deve essere rename|skip|overwrite")
@@ -137,7 +153,13 @@ def _parse(raw: dict[str, Any], source_path: Path) -> RootConfig:
         library_root = (base_dir / library_root).resolve()
 
     return RootConfig(
-        app=AppConfig(language=language, mode=mode),
+        app=AppConfig(
+            language=language,
+            mode=mode,
+            theme=theme,
+            focus_on_startup=focus_on_startup,
+            focus_on_download_complete=focus_on_download_complete,
+        ),
         watch=WatchConfig(paths=watch_paths, recursive=recursive, settle_seconds=settle_seconds),
         library=LibraryConfig(
             root=library_root,

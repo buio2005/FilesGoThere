@@ -30,9 +30,7 @@ python -m pip install pyinstaller
 Run from the project root:
 
 ```powershell
-pyinstaller --noconfirm --clean --windowed --name FilesGoThere ^
-  --add-data "config;config" ^
-  main.py
+.\build\build.ps1
 ```
 
 Expected output:
@@ -41,6 +39,13 @@ Expected output:
 Notes:
 - `--windowed` prevents a console window from opening.
 - The `--add-data` option bundles the `config/` folder next to the executable (as a starting point).
+- The project uses a `src/` layout, so the build includes `src/` in PyInstaller paths (handled by the script/spec).
+
+Alternative (single command in PowerShell):
+
+```powershell
+pyinstaller --noconfirm --clean --windowed --name FilesGoThere --paths "src" --add-data "config;config" main.py
+```
 
 ## 3) Run the build
 From the project root:
@@ -53,9 +58,7 @@ From the project root:
 If you prefer a console app:
 
 ```powershell
-pyinstaller --noconfirm --clean --console --name FilesGoThere ^
-  --add-data "config;config" ^
-  main.py
+.\build\build.ps1 -Console
 ```
 
 ## 5) Clean artifacts

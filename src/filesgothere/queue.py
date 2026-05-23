@@ -41,13 +41,43 @@ class QueueWriter:
             size_bytes=size,
         )
 
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        line = json.dumps(asdict(action), ensure_ascii=False)
-
         with self._lock:
-            with self._path.open("a", encoding="utf-8", newline="\n") as f:
-                f.write(line)
-                f.write("\n")
+            entries = _read_entries(self._path)
+            action_obj: dict[str, Any] = asdict(action)
+            src_key = str(action_obj.get("src_path", "")).casefold()
+
+            match_index: int | None = None
+            for i, (_, obj) in enumerate(entries):
+                src_existing = obj.get("src_path")
+                if isinstance(src_existing, str) and src_existing.casefold() == src_key and "status" not in obj:
+                    match_index = i
+
+            if match_index is None:
+                line = json.dumps(action_obj, ensure_ascii=False)
+                entries.append((line, action_obj))
+            else:
+                _, existing = entries[match_index]
+                merged = dict(action_obj)
+                created_at = existing.get("created_at")
+                if isinstance(created_at, str) and created_at:
+                    merged["created_at"] = created_at
+                existing_mode = existing.get("mode")
+                if isinstance(existing_mode, str) and existing_mode:
+                    merged["mode"] = existing_mode
+
+                existing_size = existing.get("size_bytes")
+                if (
+                    isinstance(existing_size, int)
+                    and existing_size >= 0
+                    and isinstance(merged.get("size_bytes"), int)
+                    and merged["size_bytes"] < 0
+                ):
+                    merged["size_bytes"] = existing_size
+
+                line = json.dumps(merged, ensure_ascii=False)
+                entries[match_index] = (line, merged)
+
+            _write_entries(self._path, entries)
 
 
 def read_actions(

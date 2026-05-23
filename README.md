@@ -39,7 +39,7 @@ Dependencies:
 2. Install dependencies:
    - `pip install -r requirements.txt`
 3. Edit your configuration:
-   - start from `config/example_config.json`
+   - start from `config/example_config.json` or a preset in `config/presets/`
    - copy it into `config/config.json`
    - set:
      - `watch.paths` (folders to monitor)
@@ -69,6 +69,13 @@ Key sections:
 Recommended (Windows) locations for runtime data:
 - Queue: `%LOCALAPPDATA%\FilesGoThere\data\queue.jsonl`
 - Logs: `%LOCALAPPDATA%\FilesGoThere\logs\filesgothere.log`
+
+Note about `library.root`:
+- If `library.root` is empty, FilesGoThere uses the source file's folder as the base destination (i.e., it organizes inside the same Downloads folder).
+
+## Presets
+Presets are optional starting points you can copy into `config/config.json` and edit.
+- `config/presets/common_it.json`: common extensions in Italian categories, designed for “organize in-place” (empty `library.root`).
 
 ## Queue commands (CLI)
 All commands below print JSON to stdout (useful for automation and for the GUI).
