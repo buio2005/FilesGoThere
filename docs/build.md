@@ -54,6 +54,10 @@ From the project root:
 .\dist\FilesGoThere\FilesGoThere.exe
 ```
 
+Notes:
+- In recent PyInstaller versions, bundled data (including `config/`) may be placed under `dist/FilesGoThere/_internal/`.
+- You can override the config path with: `.\FilesGoThere.exe --config <path>\config.json`
+
 ## 4) Build (CLI only)
 If you prefer a console app:
 

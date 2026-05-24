@@ -60,6 +60,7 @@ class MainWindow:
         self._watch_settle = config.watch.settle_seconds
         self._last_pending_sizes: dict[str, int] = {}
         self._notified_complete: set[str] = set()
+        self._first_run_hint_shown = False
         self._Qt = Qt
         self._QColor = QColor
 
@@ -249,9 +250,37 @@ class MainWindow:
         self._window.show()
         if self._focus_on_startup:
             self._bring_to_front()
+        self._maybe_show_first_run_hint()
 
     def shutdown(self) -> None:
         self.stop_watcher()
+
+    def _maybe_show_first_run_hint(self) -> None:
+        if self._first_run_hint_shown:
+            return
+        self._first_run_hint_shown = True
+        if self._watcher is not None:
+            return
+        if self._watch_paths:
+            return
+
+        box = self._QMessageBox(self._window)
+        box.setIcon(self._QMessageBox.Icon.Information)
+        box.setWindowTitle(t("gui.first_run.title", self._lang))
+        box.setText(t("gui.first_run.text", self._lang))
+        btn_suggest = box.addButton(t("gui.suggest_downloads", self._lang), self._QMessageBox.ButtonRole.ActionRole)
+        btn_add = box.addButton(t("gui.add", self._lang), self._QMessageBox.ButtonRole.ActionRole)
+        btn_later = box.addButton(t("gui.first_run.later", self._lang), self._QMessageBox.ButtonRole.RejectRole)
+        box.setDefaultButton(btn_suggest)
+        box.exec()
+
+        clicked = box.clickedButton()
+        if clicked == btn_suggest:
+            self.watch_suggest_downloads()
+        elif clicked == btn_add:
+            self.watch_add()
+        elif clicked == btn_later:
+            return
 
     def _apply_language(self) -> None:
         self._window.setWindowTitle(t("gui.title", self._lang))

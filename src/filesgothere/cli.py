@@ -12,7 +12,8 @@ from filesgothere.gui_app import gui_main
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="filesgothere")
     if getattr(sys, "frozen", False):
-        default_config = str((Path(sys.executable).resolve().parent / "config" / "config.json"))
+        base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+        default_config = str((base / "config" / "config.json"))
     else:
         default_config = str(Path("config/config.json"))
     parser.add_argument(
