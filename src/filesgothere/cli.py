@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from filesgothere.app import run
@@ -10,9 +11,13 @@ from filesgothere.gui_app import gui_main
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="filesgothere")
+    if getattr(sys, "frozen", False):
+        default_config = str((Path(sys.executable).resolve().parent / "config" / "config.json"))
+    else:
+        default_config = str(Path("config/config.json"))
     parser.add_argument(
         "--config",
-        default=str(Path("config/config.json")),
+        default=default_config,
         help="Percorso al file di configurazione JSON",
     )
 
@@ -80,4 +85,6 @@ def main(argv: list[str] | None = None) -> int:
         config_path = Path(args.gui_config or args.config)
         return gui_main(config_path)
 
+    if getattr(sys, "frozen", False):
+        return gui_main(Path(args.config))
     return run(Path(args.config))

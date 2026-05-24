@@ -51,7 +51,7 @@ pyinstaller --noconfirm --clean --windowed --name FilesGoThere --paths "src" --a
 From the project root:
 
 ```powershell
-.\dist\FilesGoThere\FilesGoThere.exe gui --config config\config.json
+.\dist\FilesGoThere\FilesGoThere.exe
 ```
 
 ## 4) Build (CLI only)

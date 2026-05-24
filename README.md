@@ -111,3 +111,5 @@ It is reasonable to start doing “dev builds” now, but a final distributable 
 
 Build guide:
 - See [build.md](docs/build.md)
+
+After extracting the ZIP, you can start the GUI by double-clicking `FilesGoThere.exe`.
