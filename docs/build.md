@@ -39,7 +39,7 @@ Expected output:
 Notes:
 - `--windowed` prevents a console window from opening.
 - The `--add-data` option bundles the `config/` folder next to the executable (as a starting point).
-- The project uses a `src/` layout, so the build includes `src/` in PyInstaller paths (handled by the script/spec).
+- The project uses a `src/` layout, so the build includes `src/` in PyInstaller paths (handled by the script).
 
 Alternative (single command in PowerShell):
 
@@ -63,7 +63,7 @@ If you prefer a console app:
 
 ## 5) Clean artifacts
 ```powershell
-Remove-Item -Recurse -Force .\build, .\dist, .\FilesGoThere.spec
+Remove-Item -Recurse -Force .\build, .\dist
 ```
 
 ## Known limitations (current phase)

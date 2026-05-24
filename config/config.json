@@ -1,14 +1,13 @@
 {
   "app": {
     "language": "it",
-    "mode": "manual"
+    "mode": "manual",
+    "theme": "light",
+    "focus_on_startup": false,
+    "focus_on_download_complete": false
   },
   "watch": {
-    "paths": [
-      "C:/Users/boxbu/Downloads",
-      "F:/LibreWolf_Downloads",
-      "F:/Firefox_Download"
-    ],
+    "paths": [],
     "recursive": false,
     "settle_seconds": 3.0
   },

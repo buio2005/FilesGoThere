@@ -110,4 +110,4 @@ It is reasonable to start doing “dev builds” now, but a final distributable 
 - the GUI flow is finalized (tray icon, settings screen, etc.)
 
 Build guide:
-- See [build.md](file:///c:/Users/boxbu/Documents/trae_projects/FilesGoThere/docs/build.md)
+- See [build.md](docs/build.md)
