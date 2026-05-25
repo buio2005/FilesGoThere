@@ -38,14 +38,10 @@ Expected output:
 
 Notes:
 - `--windowed` prevents a console window from opening.
-- The `--add-data` option bundles the `config/` folder next to the executable (as a starting point).
+- The build script bundles a sanitized `config/` (JSON files + presets only) to avoid shipping any local runtime artifacts (logs/queue).
 - The project uses a `src/` layout, so the build includes `src/` in PyInstaller paths (handled by the script).
 
-Alternative (single command in PowerShell):
-
-```powershell
-pyinstaller --noconfirm --clean --windowed --name FilesGoThere --paths "src" --add-data "config;config" main.py
-```
+Alternative: use the build script (recommended) to ensure a clean bundle.
 
 ## 3) Run the build
 From the project root:
@@ -71,5 +67,4 @@ Remove-Item -Recurse -Force .\build, .\dist
 ```
 
 ## Known limitations (current phase)
-- Runtime paths (queue/logs) should be set in `config/config.json` (recommended: `%LOCALAPPDATA%\FilesGoThere\...`).
-- A later step can add built-in expansion of `%LOCALAPPDATA%` inside JSON config for portability.
+- If you use `%LOCALAPPDATA%` in `config/config.json`, FilesGoThere expands it automatically on Windows.

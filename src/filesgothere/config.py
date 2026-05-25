@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
@@ -107,7 +109,7 @@ def _parse(raw: dict[str, Any], source_path: Path) -> RootConfig:
     if not isinstance(paths_raw, list):
         raise ConfigError("watch.paths deve essere una lista")
 
-    watch_paths = [Path(str(p)).expanduser() for p in paths_raw]
+    watch_paths = [Path(_expand_vars(str(p))).expanduser() for p in paths_raw]
     recursive = bool(watch_raw.get("recursive", False))
     settle_seconds = float(watch_raw.get("settle_seconds", 2.0))
     if settle_seconds < 0.0:
@@ -118,7 +120,7 @@ def _parse(raw: dict[str, Any], source_path: Path) -> RootConfig:
     if not raw_library_root or raw_library_root == ".":
         library_root = None
     else:
-        library_root = Path(raw_library_root).expanduser()
+        library_root = Path(_expand_vars(raw_library_root)).expanduser()
     duplicate_strategy = library_raw.get("duplicate_strategy", "rename")
     if duplicate_strategy not in ("rename", "skip", "overwrite"):
         raise ConfigError("library.duplicate_strategy deve essere rename|skip|overwrite")
@@ -131,14 +133,14 @@ def _parse(raw: dict[str, Any], source_path: Path) -> RootConfig:
     default_folder = str(rules_raw.get("default_folder", "Altro"))
 
     log_level = str(logging_raw.get("level", "INFO")).upper()
-    log_file_raw = str(logging_raw.get("file", "logs/filesgothere.log"))
+    log_file_raw = _expand_vars(str(logging_raw.get("file", "logs/filesgothere.log")))
     max_bytes = int(logging_raw.get("max_bytes", 1_048_576))
     backups = int(logging_raw.get("backups", 3))
     if max_bytes < 0 or backups < 0:
         raise ConfigError("logging.max_bytes/backups devono essere >= 0")
 
     queue_enabled = bool(queue_raw.get("enabled", True))
-    queue_file_raw = str(queue_raw.get("file", "data/queue.jsonl"))
+    queue_file_raw = _expand_vars(str(queue_raw.get("file", "data/queue.jsonl")))
 
     base_dir = source_path.parent
     log_file = Path(log_file_raw)
@@ -178,3 +180,13 @@ def _as_dict(value: Any, name: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ConfigError(f"Sezione '{name}' deve essere un oggetto")
     return value
+
+
+_UNRESOLVED_ENV_RE = re.compile(r"%[^%]+%")
+
+
+def _expand_vars(value: str) -> str:
+    expanded = os.path.expandvars(value)
+    if _UNRESOLVED_ENV_RE.search(expanded):
+        raise ConfigError(f"Variabile d'ambiente non risolta nel path: {value}")
+    return expanded

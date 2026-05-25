@@ -51,12 +51,12 @@
   },
   "logging": {
     "level": "INFO",
-    "file": "logs/filesgothere.log",
+    "file": "%LOCALAPPDATA%/FilesGoThere/logs/filesgothere.log",
     "max_bytes": 1048576,
     "backups": 3
   },
   "queue": {
     "enabled": true,
-    "file": "data/queue.jsonl"
+    "file": "%LOCALAPPDATA%/FilesGoThere/data/queue.jsonl"
   }
 }
