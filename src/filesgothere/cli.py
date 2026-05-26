@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -9,13 +11,33 @@ from filesgothere.queue_cli import queue_command
 from filesgothere.gui_app import gui_main
 
 
+def _user_config_path() -> Path:
+    base = os.environ.get("LOCALAPPDATA")
+    if base:
+        return Path(base) / "FilesGoThere" / "config" / "config.json"
+    return Path.home() / ".config" / "FilesGoThere" / "config.json"
+
+
+def _default_config_path() -> Path:
+    if getattr(sys, "frozen", False):
+        embedded_base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+        embedded_config = embedded_base / "config" / "config.json"
+        user_config = _user_config_path()
+        try:
+            if not user_config.exists() and embedded_config.exists():
+                user_config.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(embedded_config, user_config)
+            if user_config.exists():
+                return user_config
+        except Exception:
+            return embedded_config
+        return embedded_config
+    return Path("config/config.json")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="filesgothere")
-    if getattr(sys, "frozen", False):
-        base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
-        default_config = str((base / "config" / "config.json"))
-    else:
-        default_config = str(Path("config/config.json"))
+    default_config = str(_default_config_path())
     parser.add_argument(
         "--config",
         default=default_config,

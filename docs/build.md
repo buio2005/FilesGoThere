@@ -51,7 +51,7 @@ From the project root:
 ```
 
 Notes:
-- In recent PyInstaller versions, bundled data (including `config/`) may be placed under `dist/FilesGoThere/_internal/`.
+- On first start, the executable creates a user config at `%LOCALAPPDATA%\FilesGoThere\config\config.json` (copied from the bundled default) and uses it afterwards.
 - You can override the config path with: `.\FilesGoThere.exe --config <path>\config.json`
 
 ## 4) Build (CLI only)

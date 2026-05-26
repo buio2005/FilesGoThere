@@ -381,6 +381,7 @@ class MainWindow:
         if lang in ("it", "en"):
             self._lang = lang
             self._apply_language()
+            self._save_app_settings()
 
     def _sync_mode_combo(self) -> None:
         for i in range(self._mode_combo.count()):
@@ -413,6 +414,7 @@ class MainWindow:
         mode = self._mode_combo.currentData()
         if mode in ("manual", "auto"):
             self._mode = mode
+            self._save_app_settings()
 
     def _sync_theme_combo(self) -> None:
         for i in range(self._theme_combo.count()):
@@ -453,10 +455,38 @@ class MainWindow:
         if theme in ("light", "dark"):
             self._theme = theme
             self._apply_theme()
+            self._save_app_settings()
 
     def on_focus_changed(self) -> None:
         self._focus_on_startup = bool(self._chk_focus_startup.isChecked())
         self._focus_on_download_complete = bool(self._chk_focus_download.isChecked())
+        self._save_app_settings()
+
+    def _save_app_settings(self) -> None:
+        try:
+            raw = json.loads(self._config_path.read_text(encoding="utf-8"))
+        except Exception:
+            raw = {}
+
+        if not isinstance(raw, dict):
+            raw = {}
+
+        app = raw.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            raw["app"] = app
+        app["language"] = self._lang
+        app["mode"] = self._mode
+        app["theme"] = self._theme
+        app["focus_on_startup"] = bool(self._focus_on_startup)
+        app["focus_on_download_complete"] = bool(self._focus_on_download_complete)
+
+        try:
+            self._config_path.parent.mkdir(parents=True, exist_ok=True)
+            self._config_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception as e:
+            self._QMessageBox.warning(self._window, t("gui.tab.settings", self._lang), f"{t('gui.msg.write_error', self._lang)}: {e}")
+            return
 
     def _apply_theme(self) -> None:
         if self._theme == "dark":
