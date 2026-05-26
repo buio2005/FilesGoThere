@@ -70,6 +70,9 @@ Recommended (Windows) locations for runtime data:
 - Queue: `%LOCALAPPDATA%\FilesGoThere\data\queue.jsonl`
 - Logs: `%LOCALAPPDATA%\FilesGoThere\logs\filesgothere.log`
 
+Windows executable config:
+- On first start, `FilesGoThere.exe` creates `%LOCALAPPDATA%\FilesGoThere\config\config.json` (copied from the bundled default) and uses it afterwards.
+
 Note about `library.root`:
 - If `library.root` is empty, FilesGoThere uses the source file's folder as the base destination (i.e., it organizes inside the same Downloads folder).
 
