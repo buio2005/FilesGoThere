@@ -39,6 +39,7 @@ class MainWindow:
             QGroupBox,
             QComboBox,
             QCheckBox,
+            QStyle,
         )
 
         self._QMessageBox = QMessageBox
@@ -66,6 +67,7 @@ class MainWindow:
 
         self._window = QMainWindow()
         self._window.setWindowTitle(t("gui.title", self._lang))
+        self._window.setWindowIcon(self._window.style().standardIcon(QStyle.StandardPixmap.SP_ComputerIcon))
         self._apply_theme()
 
         central = QWidget()
@@ -251,7 +253,7 @@ class MainWindow:
         if self._focus_on_startup:
             from PySide6.QtCore import QTimer
 
-            QTimer.singleShot(200, self._bring_to_front)
+            QTimer.singleShot(250, self._bring_to_front)
         self._maybe_show_first_run_hint()
 
     def shutdown(self) -> None:
@@ -377,10 +379,12 @@ class MainWindow:
         self.refresh()
 
     def _sync_language_combo(self) -> None:
+        self._lang_combo.blockSignals(True)
         for i in range(self._lang_combo.count()):
             if self._lang_combo.itemData(i) == self._lang:
                 self._lang_combo.setCurrentIndex(i)
                 break
+        self._lang_combo.blockSignals(False)
 
     def on_language_changed(self) -> None:
         lang = self._lang_combo.currentData()
@@ -390,10 +394,12 @@ class MainWindow:
             self._save_app_settings()
 
     def _sync_mode_combo(self) -> None:
+        self._mode_combo.blockSignals(True)
         for i in range(self._mode_combo.count()):
             if self._mode_combo.itemData(i) == self._mode:
                 self._mode_combo.setCurrentIndex(i)
                 break
+        self._mode_combo.blockSignals(False)
 
     def _update_mode_combo_labels(self) -> None:
         self._mode_combo.blockSignals(True)
@@ -423,14 +429,22 @@ class MainWindow:
             self._save_app_settings()
 
     def _sync_theme_combo(self) -> None:
+        self._theme_combo.blockSignals(True)
         for i in range(self._theme_combo.count()):
             if self._theme_combo.itemData(i) == self._theme:
                 self._theme_combo.setCurrentIndex(i)
                 break
+        self._theme_combo.blockSignals(False)
 
     def _sync_focus_checkboxes(self) -> None:
-        self._chk_focus_startup.setChecked(bool(self._focus_on_startup))
-        self._chk_focus_download.setChecked(bool(self._focus_on_download_complete))
+        self._chk_focus_startup.blockSignals(True)
+        self._chk_focus_download.blockSignals(True)
+        try:
+            self._chk_focus_startup.setChecked(bool(self._focus_on_startup))
+            self._chk_focus_download.setChecked(bool(self._focus_on_download_complete))
+        finally:
+            self._chk_focus_startup.blockSignals(False)
+            self._chk_focus_download.blockSignals(False)
 
     def _update_language_combo_labels(self) -> None:
         self._lang_combo.blockSignals(True)
@@ -589,25 +603,24 @@ class MainWindow:
         )
 
     def _bring_to_front(self) -> None:
-        from PySide6.QtCore import QTimer
-
+        if self._window.isActiveWindow():
+            return
         if self._window.isMinimized():
             self._window.showNormal()
-        self._window.show()
         self._window.raise_()
         self._window.activateWindow()
         self._window.setWindowState((self._window.windowState() & ~self._Qt.WindowMinimized) | self._Qt.WindowActive)
 
-        self._window.setWindowFlag(self._Qt.WindowStaysOnTopHint, True)
-        self._window.show()
+        if os.name == "nt":
+            try:
+                import ctypes
 
-        def _unset() -> None:
-            self._window.setWindowFlag(self._Qt.WindowStaysOnTopHint, False)
-            self._window.show()
-            self._window.raise_()
-            self._window.activateWindow()
-
-        QTimer.singleShot(250, _unset)
+                hwnd = int(self._window.winId())
+                ctypes.windll.user32.ShowWindow(hwnd, 9)
+                ctypes.windll.user32.BringWindowToTop(hwnd)
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+            except Exception:
+                pass
 
     def start_watcher(self) -> None:
         if self._watcher is not None:
