@@ -249,10 +249,16 @@ class MainWindow:
     def show(self) -> None:
         self._window.show()
         if self._focus_on_startup:
-            self._bring_to_front()
+            from PySide6.QtCore import QTimer
+
+            QTimer.singleShot(200, self._bring_to_front)
         self._maybe_show_first_run_hint()
 
     def shutdown(self) -> None:
+        try:
+            self._save_app_settings_silent()
+        except Exception:
+            pass
         self.stop_watcher()
 
     def _maybe_show_first_run_hint(self) -> None:
@@ -488,6 +494,28 @@ class MainWindow:
             self._QMessageBox.warning(self._window, t("gui.tab.settings", self._lang), f"{t('gui.msg.write_error', self._lang)}: {e}")
             return
 
+    def _save_app_settings_silent(self) -> None:
+        try:
+            raw = json.loads(self._config_path.read_text(encoding="utf-8"))
+        except Exception:
+            raw = {}
+
+        if not isinstance(raw, dict):
+            raw = {}
+
+        app = raw.get("app")
+        if not isinstance(app, dict):
+            app = {}
+            raw["app"] = app
+        app["language"] = self._lang
+        app["mode"] = self._mode
+        app["theme"] = self._theme
+        app["focus_on_startup"] = bool(self._focus_on_startup)
+        app["focus_on_download_complete"] = bool(self._focus_on_download_complete)
+
+        self._config_path.parent.mkdir(parents=True, exist_ok=True)
+        self._config_path.write_text(json.dumps(raw, ensure_ascii=False, indent=2), encoding="utf-8")
+
     def _apply_theme(self) -> None:
         if self._theme == "dark":
             self._window.setStyleSheet(self._stylesheet_dark())
@@ -561,11 +589,25 @@ class MainWindow:
         )
 
     def _bring_to_front(self) -> None:
+        from PySide6.QtCore import QTimer
+
         if self._window.isMinimized():
             self._window.showNormal()
+        self._window.show()
         self._window.raise_()
         self._window.activateWindow()
-        self._window.setWindowState(self._window.windowState() | self._Qt.WindowActive)
+        self._window.setWindowState((self._window.windowState() & ~self._Qt.WindowMinimized) | self._Qt.WindowActive)
+
+        self._window.setWindowFlag(self._Qt.WindowStaysOnTopHint, True)
+        self._window.show()
+
+        def _unset() -> None:
+            self._window.setWindowFlag(self._Qt.WindowStaysOnTopHint, False)
+            self._window.show()
+            self._window.raise_()
+            self._window.activateWindow()
+
+        QTimer.singleShot(250, _unset)
 
     def start_watcher(self) -> None:
         if self._watcher is not None:
@@ -915,7 +957,9 @@ class MainWindow:
                 prev = self._last_pending_sizes.get(key)
                 if prev == 0 and size > 0 and key not in self._notified_complete:
                     self._notified_complete.add(key)
-                    self._bring_to_front()
+                    from PySide6.QtCore import QTimer
+
+                    QTimer.singleShot(0, self._bring_to_front)
                     break
 
         removed = set(self._last_pending_sizes.keys()) - set(current.keys())
