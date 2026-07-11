@@ -32,15 +32,22 @@ real automatic mode, history, undo, tray support, and a polished desktop GUI.
 Future versions may still refine the UI further, but the current release is intended
 to be usable as a real day-to-day Windows utility.
 
-## Requirements
-- Windows 10/11
+## For end users
+If you use the Windows installer or the portable ZIP, **you do not need to install Python**.
+
+Supported systems:
+- Windows 10
+- Windows 11
+
+## For developers
+If you want to run FilesGoThere from source or build it locally, you need:
 - Python 3.12+
 
 Dependencies:
 - `watchdog` (required)
 - `PySide6` (optional, GUI)
 
-## Quick start (CLI / backend)
+## Quick start (CLI / backend, from source)
 1. Create and activate a virtual environment (recommended).
 2. Install dependencies:
    - `pip install -r requirements.txt`
@@ -53,7 +60,7 @@ Dependencies:
 4. Run:
    - `python main.py --config config/config.json`
 
-## Quick start (Minimal GUI)
+## Quick start (Minimal GUI, from source)
 1. Install GUI dependencies:
    - `pip install -r requirements-gui.txt`
 2. Run:
