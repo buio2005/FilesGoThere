@@ -35,9 +35,9 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "..\dist\FilesGoThere\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\FilesGoThere"; Filename: "{app}\FilesGoThere.exe"
+Name: "{group}\FilesGoThere"; Filename: "{app}\FilesGoThere.exe"; IconFilename: "{app}\FilesGoThere.exe"
 Name: "{group}\Uninstall FilesGoThere"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\FilesGoThere"; Filename: "{app}\FilesGoThere.exe"; Tasks: desktopicon
+Name: "{autodesktop}\FilesGoThere"; Filename: "{app}\FilesGoThere.exe"; IconFilename: "{app}\FilesGoThere.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\FilesGoThere.exe"; Description: "{cm:LaunchProgram,FilesGoThere}"; Flags: nowait postinstall skipifsilent

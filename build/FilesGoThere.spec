@@ -46,4 +46,5 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
+    icon=str(project_root / "assets" / "filesgothere.ico"),
 )

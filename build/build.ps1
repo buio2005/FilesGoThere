@@ -41,9 +41,14 @@ if (Test-Path ".\assets") {
   $assetArgs += @("--add-data", ".\assets;assets")
 }
 
+$iconArgs = @()
+if (Test-Path ".\assets\filesgothere.ico") {
+  $iconArgs += @("--icon", ".\assets\filesgothere.ico")
+}
+
 if ($Console) {
-  & $py -m PyInstaller --noconfirm --clean --console --name FilesGoThereConsole --paths "src" --add-data "$configStage;config" @assetArgs main.py | Out-Host
+  & $py -m PyInstaller --noconfirm --clean --console --name FilesGoThereConsole --paths "src" --add-data "$configStage;config" @assetArgs @iconArgs main.py | Out-Host
   exit 0
 }
 
-& $py -m PyInstaller --noconfirm --clean --windowed --name FilesGoThere --paths "src" --add-data "$configStage;config" @assetArgs main.py | Out-Host
+& $py -m PyInstaller --noconfirm --clean --windowed --name FilesGoThere --paths "src" --add-data "$configStage;config" @assetArgs @iconArgs main.py | Out-Host
