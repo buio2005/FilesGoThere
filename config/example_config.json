@@ -8,7 +8,9 @@
       "C:/Users/USER/Downloads"
     ],
     "recursive": false,
-    "settle_seconds": 2.0
+    "settle_seconds": 2.0,
+    "settle_max_seconds": 0,
+    "ignore_globs": ["desktop.ini", "thumbs.db", ".ds_store", "~$*", ".*"]
   },
   "library": {
     "root": "C:/Users/USER/Downloads/Organizzati",

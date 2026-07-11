@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import fnmatch
+import os
 import shutil
 from pathlib import Path
 
@@ -8,9 +10,32 @@ from filesgothere.config import DuplicateStrategy
 
 TEMP_EXTENSIONS = {".part", ".crdownload", ".tmp"}
 
+_FILE_ATTRIBUTE_HIDDEN = 0x2
+_FILE_ATTRIBUTE_SYSTEM = 0x4
+
 
 def is_temporary_download(path: Path) -> bool:
     return path.suffix.lower() in TEMP_EXTENSIONS
+
+
+def is_ignored(path: Path, patterns: list[str]) -> bool:
+    """True se il file va ignorato: match su un glob della lista, oppure
+    (solo su Windows) se ha l'attributo hidden/system."""
+    name = path.name
+    lname = name.lower()
+    for pat in patterns:
+        if fnmatch.fnmatch(name, pat) or fnmatch.fnmatch(lname, pat.lower()):
+            return True
+
+    if os.name == "nt":
+        try:
+            attrs = getattr(path.stat(), "st_file_attributes", 0)
+        except OSError:
+            attrs = 0
+        if attrs & (_FILE_ATTRIBUTE_HIDDEN | _FILE_ATTRIBUTE_SYSTEM):
+            return True
+
+    return False
 
 
 def ensure_directory(path: Path) -> None:

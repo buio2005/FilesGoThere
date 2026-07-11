@@ -11,9 +11,9 @@ from watchdog.observers import Observer
 
 from filesgothere.config import WatchConfig
 from filesgothere.i18n import t
-from filesgothere.queue import QueueWriter
+from filesgothere.queue import AutoApplier, QueueWriter
 from filesgothere.rules import RuleEngine
-from filesgothere.utils import is_temporary_download
+from filesgothere.utils import is_ignored, is_temporary_download
 
 
 @dataclass(frozen=True)
@@ -31,11 +31,13 @@ class FilesGoThereWatcher:
         logger: logging.Logger,
         *,
         queue_writer: QueueWriter | None = None,
+        auto_applier: AutoApplier | None = None,
     ) -> None:
         self._ctx = ctx
         self._rules = rule_engine
         self._log = logger
         self._queue = queue_writer
+        self._auto = auto_applier
         self._observer = Observer()
         self._inflight: set[Path] = set()
         self._lock = threading.Lock()
@@ -58,6 +60,10 @@ class FilesGoThereWatcher:
             self._log.debug(t("event.skipped.temp", self._ctx.lang, path=str(path)))
             return
 
+        if is_ignored(path, self._ctx.watch.ignore_globs):
+            self._log.debug(t("event.skipped.ignored", self._ctx.lang, path=str(path)))
+            return
+
         with self._lock:
             if path in self._inflight:
                 return
@@ -69,14 +75,33 @@ class FilesGoThereWatcher:
     def _process_file(self, path: Path) -> None:
         try:
             self._log.info(t("event.detected", self._ctx.lang, path=str(path)))
-            if not _wait_for_settle(path, self._ctx.watch.settle_seconds):
+            if not _wait_for_settle(
+                path,
+                self._ctx.watch.settle_seconds,
+                max_total_seconds=self._ctx.watch.settle_max_seconds,
+                logger=self._log,
+                lang=self._ctx.lang,
+            ):
                 return
 
             dst_dir = self._rules.on_file_ready(path)
             if self._ctx.mode == "auto":
-                self._log.info(
-                    t("event.planned.auto", self._ctx.lang, path=str(path), dst_dir=str(dst_dir))
-                )
+                if self._auto is not None:
+                    moved_to, status = self._auto.apply(
+                        mode=self._ctx.mode, src_path=path, dst_dir=dst_dir
+                    )
+                    if status == "applied" and moved_to:
+                        self._log.info(
+                            t("event.moved", self._ctx.lang, src=str(path), dst=str(moved_to))
+                        )
+                    else:
+                        self._log.info(
+                            t("event.duplicate.skipped", self._ctx.lang, path=str(path))
+                        )
+                else:
+                    self._log.info(
+                        t("event.planned.auto", self._ctx.lang, path=str(path), dst_dir=str(dst_dir))
+                    )
             else:
                 self._log.info(
                     t("event.planned.manual", self._ctx.lang, path=str(path), dst_dir=str(dst_dir))
@@ -113,16 +138,31 @@ class _Handler(FileSystemEventHandler):
         self._watcher.on_candidate_file(path)
 
 
-def _wait_for_settle(path: Path, settle_seconds: float) -> bool:
+def _wait_for_settle(
+    path: Path,
+    settle_seconds: float,
+    *,
+    max_total_seconds: float = 0.0,
+    logger: logging.Logger | None = None,
+    lang: str = "en",
+) -> bool:
+    """Attende che il file sia "stabile" (dimensione invariata per
+    settle_seconds). Finché il file cresce continua ad attendere, così i
+    download grandi/lenti non vengono scartati. max_total_seconds > 0 impone
+    un tetto massimo di attesa (0 = nessun limite)."""
     if settle_seconds <= 0:
         return path.exists()
 
-    deadline = time.time() + max(settle_seconds * 10, 5.0)
-
+    start = time.time()
     last_size = -1
     stable_since: float | None = None
 
-    while time.time() < deadline:
+    while True:
+        if max_total_seconds and (time.time() - start) >= max_total_seconds:
+            if logger is not None:
+                logger.warning(t("event.settle.timeout", lang, path=str(path)))
+            return False
+
         if not path.exists():
             return False
 
@@ -142,5 +182,3 @@ def _wait_for_settle(path: Path, settle_seconds: float) -> bool:
             last_size = size
 
         time.sleep(0.3)
-
-    return False

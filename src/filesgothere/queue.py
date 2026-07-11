@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import threading
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
@@ -78,6 +79,105 @@ class QueueWriter:
                 entries[match_index] = (line, merged)
 
             _write_entries(self._path, entries)
+
+
+class AutoApplier:
+    """Sposta i file immediatamente (modalità auto) e registra l'esito nello storico."""
+
+    def __init__(self, done_path: Path, library: LibraryConfig) -> None:
+        self._done_path = done_path
+        self._library = library
+        self._lock = threading.Lock()
+
+    def apply(self, *, mode: str, src_path: Path, dst_dir: Path) -> tuple[str | None, str]:
+        try:
+            size = src_path.stat().st_size
+        except OSError:
+            size = -1
+
+        action: dict[str, Any] = {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "mode": mode,
+            "src_path": str(src_path),
+            "dst_dir": str(dst_dir),
+            "extension": src_path.suffix.lower(),
+            "size_bytes": size,
+        }
+
+        with self._lock:
+            moved = move_with_duplicates(
+                src_path,
+                dst_dir,
+                self._library.duplicate_strategy,
+                create_folders=self._library.create_folders,
+            )
+            if moved is None:
+                status = "skipped_duplicate"
+                moved_to: str | None = None
+            else:
+                status = "applied"
+                moved_to = str(moved)
+            _append_done(self._done_path, action, status=status, moved_to=moved_to)
+
+        return moved_to, status
+
+
+def undo_action(
+    done_path: Path,
+    *,
+    created_at: Any,
+    src_path: Any,
+    applied_at: Any,
+    moved_to: Any = None,
+) -> dict[str, Any]:
+    """Riporta un file spostato alla sua posizione originale.
+
+    L'azione viene individuata nello storico tramite la sua firma
+    (created_at + src_path + applied_at) per evitare disallineamenti di indice.
+    """
+    if not isinstance(src_path, str) or not src_path:
+        return {"undone": False, "reason": "invalid_action"}
+
+    entries = _read_entries(done_path)
+    match_index: int | None = None
+    for i, (_, obj) in enumerate(entries):
+        if (
+            obj.get("src_path") == src_path
+            and obj.get("created_at") == created_at
+            and obj.get("applied_at") == applied_at
+            and obj.get("status") == "applied"
+        ):
+            match_index = i
+
+    if match_index is None:
+        return {"undone": False, "reason": "not_found", "src_path": src_path}
+
+    _, obj = entries[match_index]
+    moved_raw = obj.get("moved_to")
+    if not isinstance(moved_raw, str) or not moved_raw:
+        return {"undone": False, "reason": "no_moved_to", "src_path": src_path}
+
+    moved = Path(moved_raw)
+    original = Path(src_path)
+
+    if not moved.exists():
+        return {"undone": False, "reason": "moved_missing", "moved_to": moved_raw}
+    if original.exists():
+        return {"undone": False, "reason": "source_exists", "src_path": src_path}
+
+    try:
+        original.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(moved), str(original))
+    except Exception as e:
+        return {"undone": False, "reason": "move_failed", "error": str(e), "src_path": src_path}
+
+    updated = dict(obj)
+    updated["status"] = "undone"
+    updated["undone_at"] = datetime.now(timezone.utc).isoformat()
+    entries[match_index] = (json.dumps(updated, ensure_ascii=False), updated)
+    _write_entries(done_path, entries)
+
+    return {"undone": True, "restored_to": src_path, "from": moved_raw}
 
 
 def read_actions(

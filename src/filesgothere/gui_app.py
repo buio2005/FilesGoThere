@@ -7,6 +7,42 @@ from pathlib import Path
 from filesgothere.config import ConfigError, load_config
 
 
+def _set_windows_app_id() -> None:
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("tivustream.filesgothere")
+    except Exception:
+        pass
+
+
+def _load_app_icon():
+    try:
+        from PySide6.QtGui import QIcon
+    except Exception:
+        return None
+
+    candidates: list[Path] = []
+    if getattr(sys, "frozen", False):
+        base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).resolve().parent))
+        candidates.append(base / "assets" / "filesgothere.ico")
+        candidates.append(base / "filesgothere.ico")
+    here = Path(__file__).resolve()
+    candidates.append(here.parents[2] / "assets" / "filesgothere.ico")
+
+    for candidate in candidates:
+        try:
+            if candidate.exists():
+                icon = QIcon(str(candidate))
+                if not icon.isNull():
+                    return icon
+        except Exception:
+            pass
+    return None
+
+
 def gui_main(config_path: Path) -> int:
     try:
         from PySide6.QtWidgets import QApplication, QMessageBox
@@ -23,7 +59,13 @@ def gui_main(config_path: Path) -> int:
             print(json.dumps({"error": msg}, ensure_ascii=False, indent=2))
         return 2
 
+    _set_windows_app_id()
     app = QApplication(sys.argv)
+    # Keep the process alive when the main window is hidden to the tray.
+    app.setQuitOnLastWindowClosed(False)
+    app_icon = _load_app_icon()
+    if app_icon is not None:
+        app.setWindowIcon(app_icon)
 
     try:
         config = load_config(config_path)
@@ -37,6 +79,8 @@ def gui_main(config_path: Path) -> int:
     from filesgothere.gui_main_window import MainWindow
 
     window = MainWindow(config_path=config_path, config=config)
+    if app_icon is not None:
+        window._window.setWindowIcon(app_icon)
     app.aboutToQuit.connect(window.shutdown)
     window.show()
     return app.exec()

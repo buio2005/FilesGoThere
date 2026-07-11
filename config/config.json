@@ -1,15 +1,24 @@
 {
   "app": {
-    "language": "it",
-    "mode": "manual",
+    "language": "en",
+    "mode": "auto",
     "theme": "light",
     "focus_on_startup": false,
-    "focus_on_download_complete": false
+    "focus_on_download_complete": false,
+    "minimize_to_tray": true
   },
   "watch": {
     "paths": [],
     "recursive": false,
-    "settle_seconds": 3.0
+    "settle_seconds": 3.0,
+    "settle_max_seconds": 0,
+    "ignore_globs": [
+      "desktop.ini",
+      "thumbs.db",
+      ".ds_store",
+      "~$*",
+      ".*"
+    ]
   },
   "library": {
     "root": "",

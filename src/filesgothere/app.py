@@ -7,7 +7,7 @@ from pathlib import Path
 from filesgothere.config import ConfigError, RootConfig, load_config
 from filesgothere.i18n import t
 from filesgothere.logging_setup import setup_logging
-from filesgothere.queue import QueueWriter
+from filesgothere.queue import AutoApplier, QueueWriter
 from filesgothere.rules import RuleEngine
 from filesgothere.watcher import FilesGoThereWatcher, WatchContext
 
@@ -30,13 +30,18 @@ def run(config_path: Path) -> int:
 
     rule_engine = RuleEngine(config.rules, config.library)
     queue_writer = None
+    auto_applier = None
     if config.app.mode == "manual" and config.queue.enabled:
         queue_writer = QueueWriter(config.queue.file)
+    elif config.app.mode == "auto":
+        done_path = config.queue.file.with_name("queue_done.jsonl")
+        auto_applier = AutoApplier(done_path, config.library)
     watcher = FilesGoThereWatcher(
         WatchContext(lang=config.app.language, watch=config.watch, mode=config.app.mode),
         rule_engine,
         logger,
         queue_writer=queue_writer,
+        auto_applier=auto_applier,
     )
 
     watcher.start()

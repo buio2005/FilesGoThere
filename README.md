@@ -12,19 +12,25 @@ Offline. Lightweight. Privacy-friendly.
 - Real-time multi-folder monitoring (watchdog).
 - Download safety:
   - ignores temporary/incomplete files (`.part`, `.crdownload`, `.tmp`)
-  - waits for downloads to finish (“settle”: file size stable for N seconds)
+  - waits for downloads to finish (“settle”: file size stable for N seconds); keeps waiting while the file is still growing, so large/slow downloads are not dropped
+  - skips system/junk files via a configurable ignore-list (`desktop.ini`, `thumbs.db`, `~$*`, dot-files, plus Windows hidden/system files)
 - Rule engine (initial): extension → destination subfolder + default folder.
-- Duplicate handling when applying actions: `rename | skip | overwrite`.
+- Duplicate handling: `rename | skip | overwrite`.
 - Two modes:
-  - `manual`: generates a queue of proposed actions (JSON Lines), user applies selected actions
-  - `auto`: currently still dry-run in the watcher (actions happen via Apply)
+  - `manual`: generates a queue of proposed actions (JSON Lines); you apply the selected ones after a preview
+  - `auto`: moves files automatically as soon as they are ready, recording every move in the history
+- Undo: revert an applied move (auto or manual) back to its original location from the History tab.
 - Logging: console + rotating log file (standard Python logging).
-- Minimal GUI (PySide6, optional) to view/apply actions and manage watched folders.
-- GUI language switch: Italian / English.
+- Minimal GUI (PySide6, optional) to view/apply/undo actions, filter by text/extension, and manage watched folders.
+- Settings in the GUI: language (Italian / English), mode, light/dark theme, focus options.
 
 ## Project status
-This repository focuses on a clean and maintainable backend + a minimal GUI for early testing.
-A full “PowerToys-like” tray experience is planned later.
+FilesGoThere 1.0.0 is the first complete public release of the app.
+The project already includes the full local workflow: monitoring, queue/manual mode,
+real automatic mode, history, undo, tray support, and a polished desktop GUI.
+
+Future versions may still refine the UI further, but the current release is intended
+to be usable as a real day-to-day Windows utility.
 
 ## Requirements
 - Windows 10/11
@@ -59,12 +65,20 @@ Configuration is stored as JSON and loaded at runtime.
 Key sections:
 - `app.language`: `it | en`
 - `app.mode`: `manual | auto`
+- `app.theme`: `light | dark`
 - `watch.paths`: list of folders to monitor
-- `watch.settle_seconds`: seconds of stable size before an action is produced
+- `watch.settle_seconds`: seconds of stable size before a file is considered ready
+- `watch.settle_max_seconds`: safety cap on total wait time (`0` = no cap; the watcher keeps waiting while the file grows)
+- `watch.ignore_globs`: filename globs to always skip (defaults to `desktop.ini`, `thumbs.db`, `.ds_store`, `~$*`, `.*`)
+- `library.duplicate_strategy`: `rename | skip | overwrite`
 - `rules.by_extension`: map of file extension → destination subfolder
 - `rules.default_folder`: fallback subfolder
 - `queue.file`: JSONL file storing proposed actions (manual mode)
 - `logging.file`: rotating log file path
+
+Note about `app.mode`:
+- In `manual` mode files are only proposed in the queue and moved when you confirm.
+- In `auto` mode files are moved as soon as they settle; each move is logged in the history and can be reverted with Undo.
 
 Recommended (Windows) locations for runtime data:
 - Queue: `%LOCALAPPDATA%\FilesGoThere\data\queue.jsonl`
@@ -119,3 +133,25 @@ After extracting the ZIP, you can start the GUI by double-clicking `FilesGoThere
 
 If you want to use a custom configuration file, pass it explicitly:
 - `FilesGoThere.exe --config path\to\config.json`
+
+## Windows installer
+For end users, the recommended release assets are:
+- `FilesGoThere-v1.0.0-windows.zip`: portable package
+- `FilesGoThere-Setup-v1.0.0.exe`: installer created with Inno Setup
+
+To create the installer locally:
+1. Build the app bundle:
+   - `.\build\build.ps1`
+2. Compile the Inno Setup installer:
+   - `.\build\build_installer.ps1`
+
+This produces a standalone Windows installer in `dist/`.
+
+## SmartScreen note
+Because FilesGoThere is not code-signed yet, Windows SmartScreen may warn that the app is from an unknown publisher.
+
+If that happens:
+1. Click `More info`
+2. Click `Run anyway`
+
+This is expected for unsigned indie software builds distributed outside the Microsoft Store.

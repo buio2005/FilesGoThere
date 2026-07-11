@@ -3,9 +3,19 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
+
+
+# File "spazzatura" o di sistema che non devono mai essere organizzati.
+DEFAULT_IGNORE_GLOBS: list[str] = [
+    "desktop.ini",
+    "thumbs.db",
+    ".ds_store",
+    "~$*",
+    ".*",
+]
 
 
 Language = Literal["it", "en"]
@@ -21,6 +31,7 @@ class AppConfig:
     theme: Theme = "light"
     focus_on_startup: bool = False
     focus_on_download_complete: bool = False
+    minimize_to_tray: bool = True
 
 
 @dataclass(frozen=True)
@@ -28,6 +39,8 @@ class WatchConfig:
     paths: list[Path]
     recursive: bool = False
     settle_seconds: float = 2.0
+    settle_max_seconds: float = 0.0
+    ignore_globs: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -104,6 +117,7 @@ def _parse(raw: dict[str, Any], source_path: Path) -> RootConfig:
 
     focus_on_startup = bool(app_raw.get("focus_on_startup", False))
     focus_on_download_complete = bool(app_raw.get("focus_on_download_complete", False))
+    minimize_to_tray = bool(app_raw.get("minimize_to_tray", True))
 
     paths_raw = watch_raw.get("paths", [])
     if not isinstance(paths_raw, list):
@@ -114,6 +128,18 @@ def _parse(raw: dict[str, Any], source_path: Path) -> RootConfig:
     settle_seconds = float(watch_raw.get("settle_seconds", 2.0))
     if settle_seconds < 0.0:
         raise ConfigError("watch.settle_seconds deve essere >= 0")
+
+    settle_max_seconds = float(watch_raw.get("settle_max_seconds", 0.0))
+    if settle_max_seconds < 0.0:
+        raise ConfigError("watch.settle_max_seconds deve essere >= 0")
+
+    ignore_globs_raw = watch_raw.get("ignore_globs", None)
+    if ignore_globs_raw is None:
+        ignore_globs = list(DEFAULT_IGNORE_GLOBS)
+    elif isinstance(ignore_globs_raw, list):
+        ignore_globs = [str(x) for x in ignore_globs_raw]
+    else:
+        raise ConfigError("watch.ignore_globs deve essere una lista")
 
     raw_library_root = str(library_raw.get("root", "")).strip()
     library_root: Path | None
@@ -161,8 +187,15 @@ def _parse(raw: dict[str, Any], source_path: Path) -> RootConfig:
             theme=theme,
             focus_on_startup=focus_on_startup,
             focus_on_download_complete=focus_on_download_complete,
+            minimize_to_tray=minimize_to_tray,
         ),
-        watch=WatchConfig(paths=watch_paths, recursive=recursive, settle_seconds=settle_seconds),
+        watch=WatchConfig(
+            paths=watch_paths,
+            recursive=recursive,
+            settle_seconds=settle_seconds,
+            settle_max_seconds=settle_max_seconds,
+            ignore_globs=ignore_globs,
+        ),
         library=LibraryConfig(
             root=library_root,
             create_folders=bool(library_raw.get("create_folders", True)),

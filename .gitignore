@@ -185,3 +185,14 @@ logs/
 data/
 config/data/
 config/logs/
+nuova_versione/
+
+# Keep only the reproducible build helpers under version control.
+!build/
+build/*
+!build/build.ps1
+!build/build_installer.ps1
+!build/FilesGoThere.spec
+!build/FilesGoThere.iss
+build/config_stage/
+build/FilesGoThere/
