@@ -13,7 +13,18 @@ from filesgothere.config import WatchConfig
 from filesgothere.i18n import t
 from filesgothere.queue import AutoApplier, QueueWriter
 from filesgothere.rules import RuleEngine
-from filesgothere.utils import is_ignored, is_temporary_download
+from filesgothere.utils import has_temp_sibling, is_ignored, is_temporary_download
+
+# Un file da 0 byte non viene considerato pronto: quasi sempre è il segnaposto
+# creato dal browser all'inizio del download. Dopo questa finestra di grazia,
+# se non c'è nessun gemello temporaneo accanto, lo si accetta come file
+# realmente vuoto.
+ZERO_BYTE_GRACE_SECONDS = 30.0
+
+# Il file può sparire per un istante quando il browser cancella il segnaposto e
+# subito dopo rinomina il ".part" con lo stesso nome: si tollera questa breve
+# assenza invece di rinunciare.
+MISSING_GRACE_SECONDS = 3.0
 
 
 @dataclass(frozen=True)
@@ -57,6 +68,11 @@ class FilesGoThereWatcher:
             return
 
         if is_temporary_download(path):
+            self._log.debug(t("event.skipped.temp", self._ctx.lang, path=str(path)))
+            return
+
+        if has_temp_sibling(path):
+            # Download ancora in corso: questo è il segnaposto vuoto.
             self._log.debug(t("event.skipped.temp", self._ctx.lang, path=str(path)))
             return
 
@@ -149,13 +165,18 @@ def _wait_for_settle(
     """Attende che il file sia "stabile" (dimensione invariata per
     settle_seconds). Finché il file cresce continua ad attendere, così i
     download grandi/lenti non vengono scartati. max_total_seconds > 0 impone
-    un tetto massimo di attesa (0 = nessun limite)."""
+    un tetto massimo di attesa (0 = nessun limite).
+
+    Non considera mai pronto un segnaposto di download: né un file che ha
+    accanto il gemello ".part"/".crdownload", né (salvo grazia) un file da
+    0 byte."""
     if settle_seconds <= 0:
-        return path.exists()
+        return path.exists() and not has_temp_sibling(path)
 
     start = time.time()
     last_size = -1
     stable_since: float | None = None
+    missing_since: float | None = None
 
     while True:
         if max_total_seconds and (time.time() - start) >= max_total_seconds:
@@ -164,12 +185,33 @@ def _wait_for_settle(
             return False
 
         if not path.exists():
-            return False
+            if missing_since is None:
+                missing_since = time.time()
+            elif (time.time() - missing_since) >= MISSING_GRACE_SECONDS:
+                return False
+            time.sleep(0.3)
+            continue
+        missing_since = None
 
         try:
             size = path.stat().st_size
         except OSError:
             time.sleep(0.2)
+            continue
+
+        if has_temp_sibling(path):
+            # Il download è ancora in corso: il file vero è il ".part" accanto,
+            # questo è solo il segnaposto. Si continua ad attendere: a fine
+            # download il browser lo sostituirà con il file completo.
+            stable_since = None
+            last_size = size
+            time.sleep(0.5)
+            continue
+
+        if size == 0 and (time.time() - start) < ZERO_BYTE_GRACE_SECONDS:
+            stable_since = None
+            last_size = 0
+            time.sleep(0.3)
             continue
 
         if size == last_size:

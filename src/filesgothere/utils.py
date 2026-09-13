@@ -18,6 +18,29 @@ def is_temporary_download(path: Path) -> bool:
     return path.suffix.lower() in TEMP_EXTENSIONS
 
 
+def has_temp_sibling(path: Path) -> bool:
+    """True se accanto al file esiste il "gemello" temporaneo del browser.
+
+    Firefox (e Chrome) all'inizio di un download creano DUE file: il file di
+    destinazione vuoto, da 0 byte, che serve solo a prenotare il nome
+    ("foo.zip"), e il file che cresce davvero ("foo.zip.part" oppure
+    "foo.zip.crdownload"). A download finito il segnaposto viene cancellato e
+    il temporaneo rinominato.
+
+    Se il gemello temporaneo esiste, "foo.zip" è quindi un segnaposto vuoto e
+    non va assolutamente spostato.
+    """
+    parent = path.parent
+    name = path.name
+    for ext in TEMP_EXTENSIONS:
+        try:
+            if (parent / f"{name}{ext}").exists():
+                return True
+        except OSError:
+            continue
+    return False
+
+
 def is_ignored(path: Path, patterns: list[str]) -> bool:
     """True se il file va ignorato: match su un glob della lista, oppure
     (solo su Windows) se ha l'attributo hidden/system."""
