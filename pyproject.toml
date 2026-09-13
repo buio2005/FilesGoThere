@@ -1,6 +1,8 @@
 [project]
 name = "filesgothere"
-version = "1.0.0"
+# Il numero di versione sta in un posto solo: src/filesgothere/__init__.py.
+# Qui viene letto da lì, così non può andare fuori sincrono.
+dynamic = ["version"]
 description = "Local-first automatic file organizer for Windows"
 requires-python = ">=3.12"
 dependencies = [
@@ -21,6 +23,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+
+[tool.setuptools.dynamic]
+version = {attr = "filesgothere.__version__"}
 
 [tool.setuptools.packages.find]
 where = ["src"]

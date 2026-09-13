@@ -1,8 +1,16 @@
+; Il numero di versione NON si scrive qui: arriva da build\build_installer.ps1,
+; che lo legge da src\filesgothere\__init__.py e lo passa al compilatore.
+; Se in un file Setup compare "0.0.0", significa che il compilatore e' stato
+; lanciato a mano senza lo script: rifallo con .\build\build_installer.ps1
+#ifndef AppVersion
+  #define AppVersion "0.0.0"
+#endif
+
 [Setup]
 AppId={{A8D7D4B7-7111-4E3C-A8F9-8D781B0AB1F4}
 AppName=FilesGoThere
-AppVersion=1.0.0
-AppVerName=FilesGoThere 1.0.0
+AppVersion={#AppVersion}
+AppVerName=FilesGoThere {#AppVersion}
 AppPublisher=TivuStream
 AppPublisherURL=https://filesgothere.com
 AppSupportURL=https://github.com/buio2005/FilesGoThere/issues
@@ -22,7 +30,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 SetupIconFile=..\assets\filesgothere.ico
 UninstallDisplayIcon={app}\FilesGoThere.exe
 OutputDir=..\dist
-OutputBaseFilename=FilesGoThere-Setup-v1.0.0
+OutputBaseFilename=FilesGoThere-Setup-v{#AppVersion}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
