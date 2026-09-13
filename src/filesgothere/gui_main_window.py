@@ -17,6 +17,13 @@ from filesgothere.watcher import FilesGoThereWatcher, WatchContext
 
 
 class MainWindow:
+    # Posizione delle schede. Diversi punti del codice le identificano per
+    # numero (Applica vale solo sulla prima, Annulla solo sulla seconda):
+    # non vanno riordinate senza aggiornare anche quelli.
+    _TAB_PENDING = 0
+    _TAB_HISTORY = 1
+    _TAB_SETTINGS = 2
+
     def __init__(self, *, config_path: Path, config: RootConfig) -> None:
         from PySide6.QtCore import QTimer
         from PySide6.QtCore import Qt
@@ -1280,9 +1287,13 @@ class MainWindow:
         table = self._pending_table
         prev = self._pending_selected_orig()
         scroll = table.verticalScrollBar().value()
-        table.setRowCount(len(pending))
+        # Ordine decrescente: l'ultimo arrivato in cima, per non dover scorrere
+        # liste lunghe. L'indice reale viaggia con la riga, quindi Applica,
+        # Anteprima e Annulla continuano ad agire sul file giusto.
+        rows = list(reversed(pending))
+        table.setRowCount(len(rows))
         select_row: int | None = None
-        for row, (orig, a) in enumerate(pending):
+        for row, (orig, a) in enumerate(rows):
             size_raw = a.get("size_bytes")
             size = int(size_raw) if isinstance(size_raw, int) else -1
             created = str(a.get("created_at") or "")
@@ -1305,9 +1316,11 @@ class MainWindow:
         table = self._history_table
         prev = self._history_selected_orig()
         scroll = table.verticalScrollBar().value()
-        table.setRowCount(len(done))
+        # Ordine decrescente, come nella coda: l'operazione più recente in cima.
+        rows = list(reversed(done))
+        table.setRowCount(len(rows))
         select_row: int | None = None
-        for row, (orig, a) in enumerate(done):
+        for row, (orig, a) in enumerate(rows):
             created = str(a.get("created_at") or "")
             applied = str(a.get("applied_at") or "")
             status = str(a.get("status") or "")
@@ -1612,8 +1625,9 @@ class MainWindow:
         if first_run:
             return
 
-        has_news = bool(done_keys - previous_done) or bool(pending_keys - previous_pending)
-        if not has_news:
+        new_done = bool(done_keys - previous_done)
+        new_pending = bool(pending_keys - previous_pending)
+        if not (new_done or new_pending):
             return
 
         if not self._focus_on_download_complete:
@@ -1621,9 +1635,31 @@ class MainWindow:
         if self._window.isActiveWindow():
             return
 
+        # Si mostra la scheda dove la novità è comparsa davvero: in modalità
+        # automatica il file finisce nello Storico, in manuale nella coda.
+        target_tab = self._TAB_HISTORY if new_done else self._TAB_PENDING
+
         from PySide6.QtCore import QTimer
 
-        QTimer.singleShot(0, self._bring_to_front)
+        QTimer.singleShot(0, lambda: self._raise_and_focus_tab(target_tab))
+
+    def _raise_and_focus_tab(self, tab_index: int) -> None:
+        """Porta la finestra in primo piano sulla scheda giusta, con la riga
+        nuova in cima. Se l'utente sta lavorando nelle Impostazioni non lo si
+        sposta: la finestra si alza e basta."""
+        try:
+            if self._tabs.currentIndex() != self._TAB_SETTINGS:
+                if self._tabs.currentIndex() != tab_index:
+                    self._tabs.setCurrentIndex(tab_index)
+                table = (
+                    self._pending_table
+                    if tab_index == self._TAB_PENDING
+                    else self._history_table
+                )
+                table.scrollToTop()
+        except Exception:
+            pass
+        self._bring_to_front()
 
     _KNOWN_REASONS = (
         "queue_empty",
