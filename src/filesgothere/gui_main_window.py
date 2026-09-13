@@ -68,8 +68,10 @@ class MainWindow:
         self._watch_settle = config.watch.settle_seconds
         self._watch_settle_max = config.watch.settle_max_seconds
         self._watch_ignore_globs = list(config.watch.ignore_globs)
-        self._last_pending_sizes: dict[str, int] = {}
-        self._notified_complete: set[str] = set()
+        # Firme delle azioni già viste, per accorgersi di quelle nuove.
+        # None = primo giro non ancora fatto (non deve far scattare nulla).
+        self._seen_pending_keys: set[str] | None = None
+        self._seen_done_keys: set[str] | None = None
         self._first_run_hint_shown = False
         self._last_pending_sig: tuple | None = None
         self._last_done_sig: tuple | None = None
@@ -999,22 +1001,107 @@ class MainWindow:
     def _bring_to_front(self) -> None:
         if self._window.isActiveWindow():
             return
+
+        # Ridotta nell'area di notifica la finestra è NASCOSTA, non
+        # minimizzata: senza show() non la si alza, semplicemente non esiste
+        # sullo schermo.
+        if not self._window.isVisible():
+            self._window.show()
         if self._window.isMinimized():
             self._window.showNormal()
+
         self._window.raise_()
         self._window.activateWindow()
         self._window.setWindowState((self._window.windowState() & ~self._Qt.WindowMinimized) | self._Qt.WindowActive)
 
         if os.name == "nt":
-            try:
-                import ctypes
+            self._force_foreground_windows()
 
-                hwnd = int(self._window.winId())
-                ctypes.windll.user32.ShowWindow(hwnd, 9)
-                ctypes.windll.user32.BringWindowToTop(hwnd)
-                ctypes.windll.user32.SetForegroundWindow(hwnd)
-            except Exception:
-                pass
+    def _force_foreground_windows(self) -> None:
+        """Windows rifiuta SetForegroundWindow ai processi che non sono già in
+        primo piano: è la protezione che impedisce alle finestre di rubare il
+        fuoco mentre stai scrivendo altrove.
+
+        Il rimedio standard è agganciarsi per un istante al thread della
+        finestra attiva, chiedere il primo piano e sganciarsi subito. Se
+        Windows rifiuta comunque si ripiega sul lampeggio del pulsante nella
+        barra delle applicazioni: nessun programma può garantire il primo
+        piano in ogni situazione.
+        """
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            user32 = ctypes.windll.user32
+            kernel32 = ctypes.windll.kernel32
+
+            user32.GetForegroundWindow.restype = wintypes.HWND
+            user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.c_void_p]
+            user32.GetWindowThreadProcessId.restype = wintypes.DWORD
+            user32.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+            user32.AttachThreadInput.restype = wintypes.BOOL
+            user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+            user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+            user32.BringWindowToTop.argtypes = [wintypes.HWND]
+
+            hwnd = wintypes.HWND(int(self._window.winId()))
+
+            SW_RESTORE = 9
+            user32.ShowWindow(hwnd, SW_RESTORE)
+
+            foreground = user32.GetForegroundWindow()
+            current_thread = kernel32.GetCurrentThreadId()
+            foreground_thread = (
+                user32.GetWindowThreadProcessId(foreground, None) if foreground else 0
+            )
+
+            attached = False
+            if foreground_thread and foreground_thread != current_thread:
+                attached = bool(
+                    user32.AttachThreadInput(foreground_thread, current_thread, True)
+                )
+            try:
+                user32.BringWindowToTop(hwnd)
+                user32.SetForegroundWindow(hwnd)
+            finally:
+                if attached:
+                    user32.AttachThreadInput(foreground_thread, current_thread, False)
+
+            if user32.GetForegroundWindow() != hwnd.value:
+                self._flash_taskbar_button(hwnd)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _flash_taskbar_button(hwnd) -> None:
+        """Evidenzia il pulsante nella barra delle applicazioni finché
+        l'utente non porta la finestra in primo piano."""
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            class FLASHWINFO(ctypes.Structure):
+                _fields_ = [
+                    ("cbSize", wintypes.UINT),
+                    ("hwnd", wintypes.HWND),
+                    ("dwFlags", wintypes.DWORD),
+                    ("uCount", wintypes.UINT),
+                    ("dwTimeout", wintypes.DWORD),
+                ]
+
+            FLASHW_ALL = 0x00000003
+            FLASHW_TIMERNOFG = 0x0000000C
+
+            info = FLASHWINFO(
+                ctypes.sizeof(FLASHWINFO),
+                hwnd,
+                FLASHW_ALL | FLASHW_TIMERNOFG,
+                0,
+                0,
+            )
+            ctypes.windll.user32.FlashWindowEx(ctypes.byref(info))
+        except Exception:
+            pass
 
     def start_watcher(self) -> None:
         if self._watcher is not None:
@@ -1110,7 +1197,9 @@ class MainWindow:
         pending = self._filter_indexed(all_pending, ext, contains)
         done = self._filter_indexed(all_done, ext, contains)
 
-        self._maybe_raise_on_download_complete([a for _, a in pending])
+        # Volutamente sulle liste NON filtrate: un filtro di testo attivo non
+        # deve impedire alla finestra di farsi vedere.
+        self._maybe_raise_on_download_complete(all_pending, all_done)
 
         watcher_state = "gui.state.running" if self._watcher is not None else "gui.state.stopped"
         self._status.setText(
@@ -1491,32 +1580,50 @@ class MainWindow:
 
         self._QMessageBox.information(self._window, t("gui.watch_folders", self._lang), t("gui.msg.saved", self._lang))
 
-    def _maybe_raise_on_download_complete(self, pending_actions: list[dict[str, object]]) -> None:
-        current: dict[str, int] = {}
-        for a in pending_actions:
-            src_raw = a.get("src_path")
-            size_raw = a.get("size_bytes")
-            if not isinstance(src_raw, str):
-                continue
-            size = int(size_raw) if isinstance(size_raw, int) else -1
-            key = src_raw.casefold()
-            current[key] = size
+    @staticmethod
+    def _action_key(action: dict[str, object]) -> str:
+        """Firma stabile di un'azione: identifica la riga anche se il file
+        viene poi spostato o annullato."""
+        return "|".join(
+            str(action.get(field, "")) for field in ("src_path", "created_at", "applied_at")
+        ).casefold()
 
-        if self._focus_on_download_complete and not self._window.isActiveWindow():
-            for key, size in current.items():
-                prev = self._last_pending_sizes.get(key)
-                if prev == 0 and size > 0 and key not in self._notified_complete:
-                    self._notified_complete.add(key)
-                    from PySide6.QtCore import QTimer
+    def _maybe_raise_on_download_complete(
+        self,
+        pending_actions: list[dict[str, object]],
+        done_actions: list[dict[str, object]],
+    ) -> None:
+        """Porta la finestra in primo piano quando arriva qualcosa di nuovo.
 
-                    QTimer.singleShot(0, self._bring_to_front)
-                    break
+        Funziona in entrambe le modalità: in Automatica il segnale è una riga
+        nuova nello Storico (file spostato), in Manuale una nuova proposta in
+        coda. Al primo giro memorizza soltanto lo stato esistente, altrimenti
+        l'app salterebbe in primo piano a ogni avvio.
 
-        removed = set(self._last_pending_sizes.keys()) - set(current.keys())
-        for key in removed:
-            self._notified_complete.discard(key)
+        Se arrivano più file insieme la finestra si alza una volta sola.
+        """
+        pending_keys = {self._action_key(a) for a in pending_actions}
+        done_keys = {self._action_key(a) for a in done_actions}
 
-        self._last_pending_sizes = current
+        first_run = self._seen_pending_keys is None or self._seen_done_keys is None
+        self._seen_pending_keys, previous_pending = pending_keys, self._seen_pending_keys
+        self._seen_done_keys, previous_done = done_keys, self._seen_done_keys
+
+        if first_run:
+            return
+
+        has_news = bool(done_keys - previous_done) or bool(pending_keys - previous_pending)
+        if not has_news:
+            return
+
+        if not self._focus_on_download_complete:
+            return
+        if self._window.isActiveWindow():
+            return
+
+        from PySide6.QtCore import QTimer
+
+        QTimer.singleShot(0, self._bring_to_front)
 
     _KNOWN_REASONS = (
         "queue_empty",
