@@ -71,6 +71,35 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "gui.focus_on_startup": "Porta in primo piano all'avvio dell'app",
         "gui.focus_on_download_complete": "Porta in primo piano a download completato",
         "gui.minimize_to_tray": "Riduci nell'area di notifica quando chiudi la finestra",
+        "gui.check_updates": "Controlla la disponibilità di aggiornamenti all'avvio",
+        "gui.check_updates.hint": "Unica funzione che contatta internet: all'avvio chiede a GitHub qual è l'ultima versione pubblicata. Non invia alcun dato. Preferisci restare del tutto offline? Lasciala spenta e controlla quando vuoi con il pulsante qui sotto.",
+        "gui.open_releases": "Apri la pagina delle release",
+        "gui.check_updates.confirm.title": "Attivare il controllo aggiornamenti?",
+        "gui.check_updates.confirm": (
+            "Questa è l'unica funzione di FilesGoThere che si collega a internet.\n\n"
+            "All'avvio l'app chiede a GitHub qual è l'ultima versione pubblicata e la confronta "
+            "con quella in uso. Non invia alcun dato: né i tuoi file, né le cartelle sorvegliate, "
+            "né informazioni sul computer. Nessun tracciamento, nessun account, nessuna "
+            "autenticazione.\n\n"
+            "Se preferisci tenere l'app completamente offline, lascia l'opzione spenta e usa "
+            "quando vuoi il pulsante \u00abApri la pagina delle release\u00bb per controllare a mano.\n\n"
+            "Vuoi attivare il controllo automatico?"
+        ),
+        "gui.update.available": "È disponibile la versione {version} (in uso: {current}).",
+        "gui.update.button": "Come aggiornare…",
+        "gui.update.dismiss": "Non ora",
+        "gui.update.title": "Aggiornamento disponibile",
+        "gui.update.how": (
+            "È disponibile la versione {version}. Stai usando la {current}.\n\n"
+            "Per aggiornare:\n"
+            "1. Esci da FilesGoThere dall'icona nell'area di notifica (non basta chiudere la finestra).\n"
+            "2. Scarica il nuovo file Setup dalla pagina delle release.\n"
+            "3. Lancialo: non serve disinstallare la versione attuale, viene sostituita al suo posto.\n\n"
+            "Cosa resta com'è: le tue impostazioni, lo Storico delle operazioni e i log non vengono "
+            "toccati dall'installazione. Anche l'eventuale avvio automatico con Windows continua a "
+            "funzionare, perché il percorso del programma non cambia.\n\n"
+            "Vuoi aprire ora la pagina delle release nel browser?"
+        ),
         "gui.table.index": "Indice",
         "gui.table.created": "Creato",
         "gui.table.applied_at": "Applicato",
@@ -224,6 +253,35 @@ _MESSAGES: dict[str, dict[str, str]] = {
         "gui.focus_on_startup": "Bring to front when the app starts",
         "gui.focus_on_download_complete": "Bring to front on download complete",
         "gui.minimize_to_tray": "Minimize to the system tray when closing the window",
+        "gui.check_updates": "Check for updates at startup",
+        "gui.check_updates.hint": "The only feature that contacts the internet: at startup it asks GitHub for the latest published version. No data is sent. Prefer to stay fully offline? Leave it off and check whenever you like with the button below.",
+        "gui.open_releases": "Open the releases page",
+        "gui.check_updates.confirm.title": "Enable the update check?",
+        "gui.check_updates.confirm": (
+            "This is the only feature in FilesGoThere that connects to the internet.\n\n"
+            "At startup the app asks GitHub for the latest published version and compares it with "
+            "the one you are running. No data is sent: not your files, not the watched folders, "
+            "not any information about your computer. No tracking, no account, no "
+            "authentication.\n\n"
+            "If you prefer to keep the app completely offline, leave this off and use the "
+            "\u201cOpen the releases page\u201d button whenever you want to check manually.\n\n"
+            "Enable the automatic check?"
+        ),
+        "gui.update.available": "Version {version} is available (you are running {current}).",
+        "gui.update.button": "How to update…",
+        "gui.update.dismiss": "Not now",
+        "gui.update.title": "Update available",
+        "gui.update.how": (
+            "Version {version} is available. You are running {current}.\n\n"
+            "To update:\n"
+            "1. Quit FilesGoThere from the system tray icon (closing the window is not enough).\n"
+            "2. Download the new Setup file from the releases page.\n"
+            "3. Run it: there is no need to uninstall the current version, it is replaced in place.\n\n"
+            "What stays: your settings, the operations history and the logs are not touched by the "
+            "installation. Starting with Windows keeps working too, because the program path does "
+            "not change.\n\n"
+            "Open the releases page in your browser now?"
+        ),
         "gui.table.index": "Index",
         "gui.table.created": "Created",
         "gui.table.applied_at": "Applied",

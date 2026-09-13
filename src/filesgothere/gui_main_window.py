@@ -6,8 +6,10 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from filesgothere import __version__
 from filesgothere.config import RootConfig
 from filesgothere.i18n import t
+from filesgothere.updates import RELEASES_PAGE, UpdateChecker
 from filesgothere.logging_setup import setup_logging
 from filesgothere.queue import apply_action_by_index, preview_action_by_index, read_actions
 from filesgothere.queue import AutoApplier, QueueWriter, undo_action
@@ -70,6 +72,8 @@ class MainWindow:
         self._focus_on_startup = config.app.focus_on_startup
         self._focus_on_download_complete = config.app.focus_on_download_complete
         self._minimize_to_tray = config.app.minimize_to_tray
+        self._check_updates = config.app.check_updates
+        self._update_checker = UpdateChecker(__version__)
         self._watch_paths = [Path(p) for p in config.watch.paths]
         self._watch_recursive = config.watch.recursive
         self._watch_settle = config.watch.settle_seconds
@@ -308,6 +312,27 @@ class MainWindow:
         history_header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
         history_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
 
+        # Striscia di avviso aggiornamento: nascosta finché non c'è davvero
+        # una versione nuova, così in condizioni normali non occupa spazio.
+        self._update_bar = QFrame()
+        self._update_bar.setObjectName("updateBar")
+        update_bar_layout = QHBoxLayout()
+        update_bar_layout.setContentsMargins(10, 6, 10, 6)
+        update_bar_layout.setSpacing(8)
+        self._update_label = QLabel()
+        self._update_label.setWordWrap(True)
+        self._btn_update = QPushButton()
+        self._btn_update.setObjectName("btnAccent")
+        self._btn_update_dismiss = QPushButton()
+        self._btn_update_dismiss.setObjectName("btnSlate")
+        update_bar_layout.addWidget(self._update_label, 1)
+        update_bar_layout.addWidget(self._btn_update)
+        update_bar_layout.addWidget(self._btn_update_dismiss)
+        self._update_bar.setLayout(update_bar_layout)
+        self._update_bar.hide()
+        self._pending_update = None
+        main_layout.addWidget(self._update_bar)
+
         self._tabs.addTab(self._pending_table, "")
         self._tabs.addTab(self._history_table, "")
 
@@ -351,9 +376,21 @@ class MainWindow:
         self._chk_focus_startup = QCheckBox()
         self._chk_focus_download = QCheckBox()
         self._chk_tray = QCheckBox()
+        self._chk_check_updates = QCheckBox()
+        self._updates_hint = QLabel()
+        self._updates_hint.setObjectName("statusText")
+        self._updates_hint.setWordWrap(True)
         settings_layout.addWidget(self._chk_focus_startup)
         settings_layout.addWidget(self._chk_focus_download)
         settings_layout.addWidget(self._chk_tray)
+        settings_layout.addWidget(self._chk_check_updates)
+        settings_layout.addWidget(self._updates_hint)
+        self._btn_open_releases = QPushButton()
+        self._btn_open_releases.setObjectName("btnSky")
+        releases_row = QHBoxLayout()
+        releases_row.addWidget(self._btn_open_releases)
+        releases_row.addStretch(1)
+        settings_layout.addLayout(releases_row)
         settings_layout.addStretch(1)
 
         settings_box.setLayout(settings_layout)
@@ -382,6 +419,10 @@ class MainWindow:
         self._chk_focus_startup.stateChanged.connect(self.on_focus_changed)
         self._chk_focus_download.stateChanged.connect(self.on_focus_changed)
         self._chk_tray.stateChanged.connect(self.on_tray_changed)
+        self._chk_check_updates.stateChanged.connect(self.on_check_updates_changed)
+        self._btn_open_releases.clicked.connect(self.open_releases_page)
+        self._btn_update.clicked.connect(self.show_update_instructions)
+        self._btn_update_dismiss.clicked.connect(self.dismiss_update_bar)
         self._mode_combo.currentIndexChanged.connect(self.on_mode_changed)
         self._btn_start.clicked.connect(self.start_watcher)
         self._btn_stop.clicked.connect(self.stop_watcher)
@@ -426,6 +467,7 @@ class MainWindow:
         self._sync_theme_combo()
         self._sync_focus_checkboxes()
         self._sync_tray_checkbox()
+        self._sync_updates_checkbox()
         self._sync_mode_combo()
         self._apply_language()
         self._refresh_watch_list()
@@ -433,6 +475,8 @@ class MainWindow:
 
     def show(self) -> None:
         self._window.show()
+        if self._check_updates:
+            self._update_checker.start()
         if self._focus_on_startup:
             from PySide6.QtCore import QTimer
 
@@ -617,6 +661,11 @@ class MainWindow:
         self._theme_label.setText(t("gui.theme", self._lang))
         self._chk_focus_startup.setText(t("gui.focus_on_startup", self._lang))
         self._chk_focus_download.setText(t("gui.focus_on_download_complete", self._lang))
+        self._chk_check_updates.setText(t("gui.check_updates", self._lang))
+        self._updates_hint.setText(t("gui.check_updates.hint", self._lang))
+        self._btn_open_releases.setText(t("gui.open_releases", self._lang))
+        self._btn_update.setText(t("gui.update.button", self._lang))
+        self._btn_update_dismiss.setText(t("gui.update.dismiss", self._lang))
         self._chk_tray.setText(t("gui.minimize_to_tray", self._lang))
 
         self._btn_preview.setToolTip(t("gui.tip.preview", self._lang))
@@ -755,6 +804,13 @@ class MainWindow:
         finally:
             self._chk_tray.blockSignals(False)
 
+    def _sync_updates_checkbox(self) -> None:
+        self._chk_check_updates.blockSignals(True)
+        try:
+            self._chk_check_updates.setChecked(bool(self._check_updates))
+        finally:
+            self._chk_check_updates.blockSignals(False)
+
     def _update_language_combo_labels(self) -> None:
         self._lang_combo.blockSignals(True)
         try:
@@ -796,6 +852,84 @@ class MainWindow:
         self._minimize_to_tray = bool(self._chk_tray.isChecked())
         self._save_app_settings()
 
+    def on_check_updates_changed(self) -> None:
+        enabled = bool(self._chk_check_updates.isChecked())
+
+        # Accendendola si autorizza l'unica connessione esterna dell'app:
+        # va chiesto esplicitamente, una volta, spiegando cosa comporta.
+        if enabled and not self._check_updates:
+            answer = self._QMessageBox.question(
+                self._window,
+                t("gui.check_updates.confirm.title", self._lang),
+                t("gui.check_updates.confirm", self._lang),
+            )
+            if answer != self._QMessageBox.StandardButton.Yes:
+                self._chk_check_updates.blockSignals(True)
+                try:
+                    self._chk_check_updates.setChecked(False)
+                finally:
+                    self._chk_check_updates.blockSignals(False)
+                return
+
+        self._check_updates = enabled
+        self._save_app_settings()
+        # Attivandola adesso il controllo parte subito, senza aspettare il
+        # prossimo avvio: è il momento in cui l'utente se lo aspetta.
+        if self._check_updates:
+            self._update_checker.start()
+
+    def open_releases_page(self) -> None:
+        """Apre la pagina delle release nel browser. È l'alternativa manuale
+        al controllo automatico: funziona anche con l'opzione spenta, e la
+        connessione la fa il browser, non FilesGoThere."""
+        try:
+            import webbrowser
+
+            webbrowser.open(RELEASES_PAGE)
+        except Exception:
+            pass
+
+    def show_update_instructions(self) -> None:
+        """Spiega come aggiornare e, su conferma, apre la pagina delle
+        release nel browser."""
+        info = self._pending_update
+        if info is None:
+            return
+
+        answer = self._QMessageBox.question(
+            self._window,
+            t("gui.update.title", self._lang),
+            t("gui.update.how", self._lang, version=info.version, current=__version__),
+        )
+        if answer != self._QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            import webbrowser
+
+            webbrowser.open(info.url)
+        except Exception:
+            pass
+
+    def dismiss_update_bar(self) -> None:
+        """Nasconde la striscia per questa sessione. Al prossimo avvio, se
+        l'aggiornamento è ancora disponibile, ricompare."""
+        self._pending_update = None
+        self._update_bar.hide()
+
+    def _poll_update_check(self) -> None:
+        """Raccoglie l'esito del controllo, che gira in un altro thread.
+        Chiamato dal giro di aggiornamento, quindi dal thread giusto per
+        toccare i widget."""
+        info = self._update_checker.take_result()
+        if info is None:
+            return
+        self._pending_update = info
+        self._update_label.setText(
+            t("gui.update.available", self._lang, version=info.version, current=__version__)
+        )
+        self._update_bar.show()
+
     def _apply_app_section(self, raw: dict) -> None:
         app = raw.get("app")
         if not isinstance(app, dict):
@@ -807,6 +941,7 @@ class MainWindow:
         app["focus_on_startup"] = bool(self._focus_on_startup)
         app["focus_on_download_complete"] = bool(self._focus_on_download_complete)
         app["minimize_to_tray"] = bool(self._minimize_to_tray)
+        app["check_updates"] = bool(self._check_updates)
 
     def _save_config(self, *, silent: bool = False) -> bool:
         try:
@@ -952,6 +1087,7 @@ class MainWindow:
             "QTableWidget::item:selected{background:#dbeafe;color:#111827;}"
             "QLabel#statusText{color:#475569;}"
             "QFrame#actionsSeparator{background:#cbd5e1;min-height:1px;max-height:1px;border:none;}"
+            "QFrame#updateBar{background:#ecfdf5;border:1px solid #6ee7b7;border-radius:10px;}"
         )
 
     def _stylesheet_dark(self) -> str:
@@ -1003,6 +1139,7 @@ class MainWindow:
             "QTableWidget::item:selected{background:#1d4ed8;color:#ffffff;}"
             "QLabel#statusText{color:#94a3b8;}"
             "QFrame#actionsSeparator{background:#334155;min-height:1px;max-height:1px;border:none;}"
+            "QFrame#updateBar{background:#062e26;border:1px solid #0f766e;border-radius:10px;}"
         )
 
     def _bring_to_front(self) -> None:
@@ -1180,6 +1317,9 @@ class MainWindow:
         self._focus_on_startup = config.app.focus_on_startup
         self._focus_on_download_complete = config.app.focus_on_download_complete
         self._minimize_to_tray = config.app.minimize_to_tray
+        # Il controllo resta "una volta per avvio": ricaricare la
+        # configurazione aggiorna l'opzione ma non fa ripartire la verifica.
+        self._check_updates = config.app.check_updates
         self._watch_paths = [Path(p) for p in config.watch.paths]
         self._watch_recursive = config.watch.recursive
         self._watch_settle = config.watch.settle_seconds
@@ -1189,6 +1329,7 @@ class MainWindow:
         self._sync_theme_combo()
         self._sync_focus_checkboxes()
         self._sync_tray_checkbox()
+        self._sync_updates_checkbox()
         self._sync_mode_combo()
         self._apply_language()
         self._refresh_watch_list()
@@ -1207,6 +1348,7 @@ class MainWindow:
         # Volutamente sulle liste NON filtrate: un filtro di testo attivo non
         # deve impedire alla finestra di farsi vedere.
         self._maybe_raise_on_download_complete(all_pending, all_done)
+        self._poll_update_check()
 
         watcher_state = "gui.state.running" if self._watcher is not None else "gui.state.stopped"
         self._status.setText(

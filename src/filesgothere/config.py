@@ -32,6 +32,9 @@ class AppConfig:
     focus_on_startup: bool = False
     focus_on_download_complete: bool = False
     minimize_to_tray: bool = True
+    # Spento di default: FilesGoThere non contatta internet se non glielo si
+    # chiede esplicitamente dalle Impostazioni.
+    check_updates: bool = False
 
 
 @dataclass(frozen=True)
@@ -118,6 +121,7 @@ def _parse(raw: dict[str, Any], source_path: Path) -> RootConfig:
     focus_on_startup = bool(app_raw.get("focus_on_startup", False))
     focus_on_download_complete = bool(app_raw.get("focus_on_download_complete", False))
     minimize_to_tray = bool(app_raw.get("minimize_to_tray", True))
+    check_updates = bool(app_raw.get("check_updates", False))
 
     paths_raw = watch_raw.get("paths", [])
     if not isinstance(paths_raw, list):
@@ -188,6 +192,7 @@ def _parse(raw: dict[str, Any], source_path: Path) -> RootConfig:
             focus_on_startup=focus_on_startup,
             focus_on_download_complete=focus_on_download_complete,
             minimize_to_tray=minimize_to_tray,
+            check_updates=check_updates,
         ),
         watch=WatchConfig(
             paths=watch_paths,

@@ -6,7 +6,8 @@ Offline. Lightweight. Privacy-friendly.
 ## Why it exists
 - Keep your Downloads folders tidy without giving up control.
 - Prefer “suggest + confirm” instead of silent automation.
-- Work fully offline (no cloud, no telemetry).
+- Work fully offline by default (no cloud, no telemetry, no account). The only optional
+  internet request is the update check described below, and it is off unless you turn it on.
 
 ## Current features
 - Real-time multi-folder monitoring (watchdog).
@@ -23,6 +24,7 @@ Offline. Lightweight. Privacy-friendly.
 - Logging: console + rotating log file (standard Python logging).
 - Minimal GUI (PySide6, optional) to view/apply/undo actions, filter by text/extension, and manage watched folders.
 - Settings in the GUI: language (Italian / English), mode, light/dark theme, focus options.
+- Optional update check against the GitHub releases page (off by default, see below).
 
 ## Project status
 FilesGoThere 1.0.0 is the first complete public release of the app.
@@ -153,6 +155,43 @@ To create the installer locally:
    - `.\build\build_installer.ps1`
 
 This produces a standalone Windows installer in `dist/`.
+
+## Start with Windows (optional)
+FilesGoThere does not add itself to Windows startup: if you want it running from login,
+add a shortcut yourself.
+
+1. Press `Win + R`, type `shell:startup` and press Enter. The Startup folder opens.
+2. Create a shortcut to `FilesGoThere.exe` inside it.
+   - Installed with the Setup: `%LOCALAPPDATA%\Programs\FilesGoThere\FilesGoThere.exe`
+   - Portable ZIP: the `FilesGoThere.exe` in the folder where you extracted it.
+
+Pair it with **Minimize to the system tray when closing the window** in the Settings tab,
+so the app starts quietly and waits in the notification area.
+
+The shortcut survives an in-place update, because the program path does not change.
+
+## Update check (optional, off by default)
+FilesGoThere can tell you when a newer release is published. It is **disabled unless you
+enable it** in the Settings tab (`app.check_updates` in the JSON configuration), and the
+first time you turn it on the app explains what it does and asks for confirmation.
+
+When enabled, once per startup and in the background, the app asks the public GitHub API
+for the latest published tag and compares it with its own version. **No data is sent**:
+not your files, not the watched folders, not any information about your machine. The
+request is unauthenticated and there is no tracking. If the machine is offline the attempt
+fails silently and is not retried until the next start.
+
+If you would rather keep the app completely offline, leave it off and use the
+**Open the releases page** button in the Settings tab whenever you want to check by hand:
+that opens your browser, and FilesGoThere itself never connects.
+
+### Updating
+1. Quit FilesGoThere from the tray icon (closing the window is not enough).
+2. Download the new Setup from the releases page and run it.
+3. There is no need to uninstall first: the installer replaces the app in place.
+
+Your settings, the operations history and the logs live in `%LOCALAPPDATA%\FilesGoThere\`
+and are never touched by the installer.
 
 ## SmartScreen note
 Because FilesGoThere is not code-signed yet, Windows SmartScreen may warn that the app is from an unknown publisher.
