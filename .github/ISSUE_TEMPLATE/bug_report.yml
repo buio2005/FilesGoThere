@@ -1,0 +1,47 @@
+name: Segnala un problema
+description: Segnala un bug o un malfunzionamento
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Grazie per la segnalazione. Non inserire dati personali, password, chiavi o log non ripuliti. Rispondo quando posso, senza tempi garantiti.
+  - type: input
+    id: strumento
+    attributes:
+      label: Software o strumento
+      description: Nome del software o dello strumento web e, se la conosci, la versione.
+      placeholder: "Esempio: DeskStamp 1.2"
+    validations:
+      required: true
+  - type: input
+    id: sistema
+    attributes:
+      label: Sistema operativo (e browser, per gli strumenti web)
+      placeholder: "Esempio: Windows 11, oppure Firefox su Linux"
+    validations:
+      required: true
+  - type: textarea
+    id: cosa-succede
+    attributes:
+      label: Cosa è successo
+      description: Descrivi il problema, con eventuali messaggi di errore.
+    validations:
+      required: true
+  - type: textarea
+    id: passaggi
+    attributes:
+      label: Come riprodurlo
+      description: I passaggi da fare per far comparire il problema.
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: atteso
+    attributes:
+      label: Cosa ti aspettavi
+    validations:
+      required: false
