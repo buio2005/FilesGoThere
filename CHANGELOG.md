@@ -4,6 +4,38 @@ All notable changes to FilesGoThere are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-09-20
+
+### Added
+- **Multi-row selection** in both the Pending and History tables (Ctrl for
+  scattered rows, Shift for a range). **Apply** and **Undo** act on every
+  selected row and confirm how many; Preview, Open source and Open destination
+  still work on a single row and say so instead of acting on an arbitrary one.
+- **History cleanup**, which was missing entirely: **Remove from the list** for
+  the selected rows and **Clear the history** for all of them. Neither touches
+  any file on disk — they only delete the record, which also means those moves
+  can no longer be undone. Both ask you to stop monitoring first, so a download
+  finishing mid-operation cannot be dropped from the record.
+- **The log now records every time the window is brought to front**, and which
+  tab was shown.
+
+### Changed
+- **The app opens on the tab that fits the mode**: History in `auto`, Pending in
+  `manual`. In automatic mode the queue is always empty, so starting there meant
+  being greeted by an empty table.
+- The window title is now just `FilesGoThere`: the old "minimal GUI" label dated
+  back to when the interface was a prototype, and it also headed every dialog.
+
+### Fixed
+- **Zero-byte placeholders could still be moved on large downloads.** The
+  previous fix waited 30 seconds before accepting an empty file as real, which
+  is fine for a quick download and useless for a 900 MB one: the placeholder was
+  moved and the finished file landed beside it as `name (1).ext`. A zero-byte
+  file is now never considered ready, with no time limit at all — browsers keep
+  the placeholder empty for the whole download and name their temporary files
+  differently from version to version, so no threshold is safe.
+  As a side effect the window no longer comes to the front twice per download.
+
 ## [1.1.0] - 2026-09-13
 
 ### Added
