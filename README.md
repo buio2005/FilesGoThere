@@ -22,7 +22,7 @@ Offline. Lightweight. Privacy-friendly.
   - `auto`: moves files automatically as soon as they are ready, recording every move in the history
 - Undo: revert an applied move (auto or manual) back to its original location from the History tab.
 - Logging: console + rotating log file (standard Python logging).
-- Minimal GUI (PySide6, optional) to view/apply/undo actions, filter by text/extension, and manage watched folders.
+- Desktop GUI (PySide6, optional) to view/apply/undo actions, filter by text/extension, and manage watched folders.
 - Settings in the GUI: language (Italian / English), mode, light/dark theme, focus options.
 - Optional update check against the GitHub releases page (off by default, see below).
 
@@ -62,7 +62,7 @@ Dependencies:
 4. Run:
    - `python main.py --config config/config.json`
 
-## Quick start (Minimal GUI, from source)
+## Quick start (GUI, from source)
 1. Install GUI dependencies:
    - `pip install -r requirements-gui.txt`
 2. Run:
