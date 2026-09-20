@@ -180,6 +180,42 @@ def undo_action(
     return {"undone": True, "restored_to": src_path, "from": moved_raw}
 
 
+def done_signature(action: dict[str, Any]) -> tuple[Any, Any, Any]:
+    """Identifica una riga dello Storico senza dipendere dalla sua posizione.
+
+    Serve perche' l'elenco viene riscritto: un indice non sopravvive a una
+    rimozione, questa firma si'."""
+    return (action.get("created_at"), action.get("src_path"), action.get("applied_at"))
+
+
+def delete_done_actions(done_path: Path, signatures: Iterable[Any]) -> dict[str, Any]:
+    """Toglie dallo Storico le righe indicate.
+
+    NON tocca alcun file su disco: rimuove soltanto la traccia dell'operazione.
+    Come effetto collaterale quello spostamento non sara' piu' annullabile,
+    perche' e' la riga a ricordare da dove veniva il file.
+    """
+    wanted = {tuple(sig) for sig in signatures}
+    if not wanted or not done_path.exists():
+        return {"removed": 0, "remaining": 0, "done_file": str(done_path)}
+
+    entries = _read_entries(done_path)
+    kept = [(line, obj) for line, obj in entries if done_signature(obj) not in wanted]
+    removed = len(entries) - len(kept)
+    if removed:
+        _write_entries(done_path, kept)
+    return {"removed": removed, "remaining": len(kept), "done_file": str(done_path)}
+
+
+def clear_done(done_path: Path) -> dict[str, Any]:
+    """Svuota lo Storico. Anche qui nessun file viene toccato."""
+    if not done_path.exists():
+        return {"removed": 0, "remaining": 0, "done_file": str(done_path)}
+    removed = len(_read_entries(done_path))
+    done_path.write_text("", encoding="utf-8")
+    return {"removed": removed, "remaining": 0, "done_file": str(done_path)}
+
+
 def read_actions(
     path: Path,
     *,

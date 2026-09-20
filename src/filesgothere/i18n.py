@@ -101,6 +101,27 @@ _MESSAGES: dict[str, dict[str, str]] = {
             "funzionare, perché il percorso del programma non cambia.\n\n"
             "Vuoi aprire ora la pagina delle release nel browser?"
         ),
+        "gui.history.remove": "Rimuovi dall'elenco",
+        "gui.history.clear": "Svuota lo Storico",
+        "gui.msg.select_one_row": "Questa azione lavora su una riga sola: selezionane una.",
+        "gui.msg.stop_before_history": "Ferma il monitoraggio prima di ripulire lo Storico.",
+        "gui.confirm.apply.many": "Applicare {count} azioni selezionate?",
+        "gui.confirm.undo.many": "Annullare {count} spostamenti selezionati? I file torneranno alla posizione di partenza.",
+        "gui.confirm.history_remove": (
+            "Rimuovere {count} righe dall'elenco?\n\n"
+            "I file NON vengono toccati: si cancella solo la traccia delle operazioni. "
+            "Quegli spostamenti non potranno piu' essere annullati, perche' e' la riga "
+            "a ricordare da dove veniva il file."
+        ),
+        "gui.confirm.history_clear": (
+            "Svuotare completamente lo Storico ({count} righe)?\n\n"
+            "I file NON vengono toccati: si cancella solo l'elenco delle operazioni. "
+            "Nessuno degli spostamenti registrati potra' piu' essere annullato."
+        ),
+        "gui.info.history_removed": "Righe rimosse dall'elenco: {count}. Nessun file e' stato toccato.",
+        "gui.info.history_empty": "Lo Storico e' gia' vuoto.",
+        "gui.info.bulk_done": "Operazioni completate: {count}.",
+        "gui.info.bulk_partial": "Completate: {count}. Non riuscite: {failed}.",
         "gui.table.index": "Indice",
         "gui.table.created": "Creato",
         "gui.table.applied_at": "Applicato",
@@ -284,6 +305,27 @@ _MESSAGES: dict[str, dict[str, str]] = {
             "not change.\n\n"
             "Open the releases page in your browser now?"
         ),
+        "gui.history.remove": "Remove from the list",
+        "gui.history.clear": "Clear the history",
+        "gui.msg.select_one_row": "This action works on a single row: select just one.",
+        "gui.msg.stop_before_history": "Stop monitoring before cleaning up the history.",
+        "gui.confirm.apply.many": "Apply the {count} selected actions?",
+        "gui.confirm.undo.many": "Undo the {count} selected moves? The files will go back to where they came from.",
+        "gui.confirm.history_remove": (
+            "Remove {count} rows from the list?\n\n"
+            "The files are NOT touched: only the record of the operations is deleted. "
+            "Those moves can no longer be undone, because it is the row that remembers "
+            "where the file came from."
+        ),
+        "gui.confirm.history_clear": (
+            "Clear the entire history ({count} rows)?\n\n"
+            "The files are NOT touched: only the list of operations is deleted. "
+            "None of the recorded moves will be undoable any more."
+        ),
+        "gui.info.history_removed": "Rows removed from the list: {count}. No file was touched.",
+        "gui.info.history_empty": "The history is already empty.",
+        "gui.info.bulk_done": "Operations completed: {count}.",
+        "gui.info.bulk_partial": "Completed: {count}. Failed: {failed}.",
         "gui.table.index": "Index",
         "gui.table.created": "Created",
         "gui.table.applied_at": "Applied",

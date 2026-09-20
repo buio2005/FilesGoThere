@@ -212,6 +212,16 @@ class MainWindow:
         self._btn_undo.setObjectName("btnViolet")
         self._btn_undo.setEnabled(False)
 
+        # Pulizia dello Storico. I nomi sono deliberatamente "Rimuovi
+        # dall'elenco" e "Svuota": in una tabella piena di percorsi di file,
+        # "Elimina" verrebbe letto come "cancella il file".
+        self._btn_history_remove = QPushButton()
+        self._btn_history_remove.setObjectName("btnSlate")
+        self._btn_history_remove.setEnabled(False)
+        self._btn_history_clear = QPushButton()
+        self._btn_history_clear.setObjectName("btnDanger")
+        self._btn_history_clear.setEnabled(False)
+
         actions_box = QGroupBox()
         self._actions_box = actions_box
         actions_layout = QGridLayout()
@@ -225,28 +235,30 @@ class MainWindow:
             self._btn_open_dst,
             self._btn_archive,
             self._btn_undo,
+            self._btn_history_remove,
+            self._btn_history_clear,
         ]
         for i, button in enumerate(top_buttons):
             button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             actions_layout.addWidget(button, 0, i)
-        self._actions_separator = QFrame()
-        self._actions_separator.setObjectName("actionsSeparator")
-        self._actions_separator.setFrameShape(QFrame.Shape.HLine)
-        self._actions_separator.setFrameShadow(QFrame.Shadow.Plain)
-        actions_layout.addWidget(self._actions_separator, 1, 0, 1, 3)
-        middle_buttons = bottom_buttons[:3]
-        lower_buttons = bottom_buttons[3:]
-        for i, button in enumerate(middle_buttons):
-            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            actions_layout.addWidget(button, 2, i)
-        self._actions_separator_bottom = QFrame()
-        self._actions_separator_bottom.setObjectName("actionsSeparator")
-        self._actions_separator_bottom.setFrameShape(QFrame.Shape.HLine)
-        self._actions_separator_bottom.setFrameShadow(QFrame.Shadow.Plain)
-        actions_layout.addWidget(self._actions_separator_bottom, 3, 0, 1, 3)
-        for i, button in enumerate(lower_buttons):
-            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            actions_layout.addWidget(button, 4, i)
+
+        # I pulsanti che agiscono sulle righe vanno a gruppi di tre, separati
+        # da una linea. Il ciclo evita di dover riscrivere la griglia a mano
+        # ogni volta che se ne aggiunge uno.
+        self._actions_separators = []
+        row = 1
+        for start in range(0, len(bottom_buttons), 3):
+            separator = QFrame()
+            separator.setObjectName("actionsSeparator")
+            separator.setFrameShape(QFrame.Shape.HLine)
+            separator.setFrameShadow(QFrame.Shadow.Plain)
+            actions_layout.addWidget(separator, row, 0, 1, 3)
+            self._actions_separators.append(separator)
+            row += 1
+            for i, button in enumerate(bottom_buttons[start:start + 3]):
+                button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+                actions_layout.addWidget(button, row, i)
+            row += 1
         actions_box.setLayout(actions_layout)
         main_layout.addWidget(actions_box)
 
@@ -284,14 +296,14 @@ class MainWindow:
 
         self._pending_table = QTableWidget(0, 6)
         self._pending_table.setSelectionBehavior(self._pending_table.SelectionBehavior.SelectRows)
-        self._pending_table.setSelectionMode(self._pending_table.SelectionMode.SingleSelection)
+        self._pending_table.setSelectionMode(self._pending_table.SelectionMode.ExtendedSelection)
         self._pending_table.setEditTriggers(self._pending_table.EditTrigger.NoEditTriggers)
         self._pending_table.setAlternatingRowColors(True)
         self._pending_table.setHorizontalScrollMode(self._pending_table.ScrollMode.ScrollPerPixel)
 
         self._history_table = QTableWidget(0, 6)
         self._history_table.setSelectionBehavior(self._history_table.SelectionBehavior.SelectRows)
-        self._history_table.setSelectionMode(self._history_table.SelectionMode.SingleSelection)
+        self._history_table.setSelectionMode(self._history_table.SelectionMode.ExtendedSelection)
         self._history_table.setEditTriggers(self._history_table.EditTrigger.NoEditTriggers)
         self._history_table.setAlternatingRowColors(True)
         self._history_table.setHorizontalScrollMode(self._history_table.ScrollMode.ScrollPerPixel)
@@ -433,6 +445,8 @@ class MainWindow:
         self._btn_apply.clicked.connect(self.apply_selected)
         self._btn_archive.clicked.connect(self.archive_all)
         self._btn_undo.clicked.connect(self.undo_selected)
+        self._btn_history_remove.clicked.connect(self.remove_history_selected)
+        self._btn_history_clear.clicked.connect(self.clear_history)
         self._tabs.currentChanged.connect(self.on_tab_changed)
         self._btn_search.clicked.connect(self.refresh)
         self._btn_clear.clicked.connect(self.clear_filters)
@@ -642,6 +656,8 @@ class MainWindow:
         self._btn_open_dst.setText(t("gui.open_destination", self._lang))
         self._btn_apply.setText(t("gui.apply", self._lang))
         self._btn_archive.setText(t("gui.archive_all", self._lang))
+        self._btn_history_remove.setText(t("gui.history.remove", self._lang))
+        self._btn_history_clear.setText(t("gui.history.clear", self._lang))
         self._btn_undo.setText(t("gui.undo", self._lang))
 
         self._filter_text_label.setText(t("gui.filter.text", self._lang))
@@ -730,6 +746,9 @@ class MainWindow:
         self._btn_apply.setEnabled(is_pending)
         self._btn_archive.setEnabled(is_pending)
         self._btn_undo.setEnabled(tab == 1)
+        is_history = tab == self._TAB_HISTORY
+        self._btn_history_remove.setEnabled(is_history)
+        self._btn_history_clear.setEnabled(is_history)
         self.refresh()
 
     def _sync_language_combo(self) -> None:
@@ -1514,12 +1533,58 @@ class MainWindow:
         data = item.data(self._Qt.ItemDataRole.UserRole)
         return int(data) if isinstance(data, int) else None
 
+    def _selected_origs(self, table) -> list[int]:
+        """Indici reali delle righe selezionate, in ordine crescente.
+
+        L'indice viaggia dentro la riga e non coincide con la sua posizione a
+        schermo: l'elenco e' mostrato dal piu' recente al piu' vecchio e puo'
+        essere filtrato. Leggerlo dalla riga e' l'unico modo corretto.
+        """
+        out: list[int] = []
+        try:
+            rows = table.selectionModel().selectedRows()
+        except Exception:
+            return out
+        for row in rows:
+            item = table.item(row.row(), 0)
+            if item is None:
+                continue
+            data = item.data(self._Qt.ItemDataRole.UserRole)
+            if isinstance(data, int):
+                out.append(data)
+        return sorted(set(out))
+
+    def _pending_selected_origs(self) -> list[int]:
+        return self._selected_origs(self._pending_table)
+
+    def _history_selected_origs(self) -> list[int]:
+        return self._selected_origs(self._history_table)
+
+    def _too_many_selected(self, title: str) -> bool:
+        """Anteprima e Apri lavorano su una riga sola: aprire venti cartelle
+        in un colpo non e' un servizio. Se ne sono selezionate di piu' si
+        avvisa invece di agire sulla prima a caso."""
+        table = (
+            self._pending_table
+            if self._tabs.currentIndex() == self._TAB_PENDING
+            else self._history_table
+        )
+        if len(self._selected_origs(table)) > 1:
+            self._QMessageBox.information(
+                self._window, title, t("gui.msg.select_one_row", self._lang)
+            )
+            return True
+        return False
+
     def _selected_index(self) -> int | None:
         if self._tabs.currentIndex() != 0:
             return None
         return self._pending_selected_orig()
 
     def preview_selected(self) -> None:
+        if self._too_many_selected(t("gui.preview", self._lang)):
+            return
+
         if self._tabs.currentIndex() == 0:
             index = self._selected_index()
             if index is None:
@@ -1577,40 +1642,68 @@ class MainWindow:
             self._QMessageBox.information(self._window, t("gui.apply", self._lang), t("gui.msg.stop_before_apply", self._lang))
             return
 
-        index = self._selected_index()
-        if index is None:
+        indexes = self._pending_selected_origs()
+        if not indexes:
             self._QMessageBox.information(self._window, t("gui.apply", self._lang), t("gui.msg.select_row", self._lang))
             return
 
-        preview = preview_action_by_index(self._queue_path, index, self._config.library)
-        if preview.get("reason") == "queue_empty":
-            self._QMessageBox.information(self._window, t("gui.apply", self._lang), t("gui.queue.pending", self._lang) + ": 0")
-            return
+        if len(indexes) == 1:
+            preview = preview_action_by_index(self._queue_path, indexes[0], self._config.library)
+            if preview.get("reason") == "queue_empty":
+                self._QMessageBox.information(self._window, t("gui.apply", self._lang), t("gui.queue.pending", self._lang) + ": 0")
+                return
+            text = t(
+                "gui.confirm.apply.text",
+                self._lang,
+                src=str(preview.get("src_path")),
+                dst=str(preview.get("predicted_moved_to")),
+                warnings=", ".join(self._tr_warning(str(w)) for w in (preview.get("warnings") or [])),
+            )
+        else:
+            text = t("gui.confirm.apply.many", self._lang, count=str(len(indexes)))
 
-        text = t(
-            "gui.confirm.apply.text",
-            self._lang,
-            src=str(preview.get("src_path")),
-            dst=str(preview.get("predicted_moved_to")),
-            warnings=", ".join(self._tr_warning(str(w)) for w in (preview.get("warnings") or [])),
-        )
         answer = self._QMessageBox.question(self._window, t("gui.confirm.apply.title", self._lang), text)
         if answer != self._QMessageBox.StandardButton.Yes:
             return
 
-        result = apply_action_by_index(
-            self._queue_path,
-            self._done_path,
-            index,
-            self._config.library,
-            require_same_size=True,
-        )
-        if result.get("applied") is True:
-            self._QMessageBox.information(self._window, t("gui.apply", self._lang), t("gui.info.applied", self._lang))
-        else:
-            self._QMessageBox.warning(self._window, t("gui.apply", self._lang), self._explain_result(result))
+        # Dal piu' alto al piu' basso, sempre. Applicare una riga la toglie
+        # dalla coda e fa scalare di uno tutte quelle che le stanno sotto:
+        # procedendo in avanti si finirebbe per applicare il file sbagliato.
+        applied = 0
+        failures: list[dict] = []
+        for index in sorted(indexes, reverse=True):
+            result = apply_action_by_index(
+                self._queue_path,
+                self._done_path,
+                index,
+                self._config.library,
+                require_same_size=True,
+            )
+            if result.get("applied") is True:
+                applied += 1
+            else:
+                failures.append(result)
 
+        self._report_bulk(t("gui.apply", self._lang), applied, failures)
         self.refresh()
+
+    def _report_bulk(self, title: str, done_count: int, failures: list[dict]) -> None:
+        """Esito di un'operazione su piu' righe: quante sono riuscite e, se
+        qualcosa e' fallito, perche'."""
+        if not failures:
+            self._QMessageBox.information(
+                self._window, title, t("gui.info.bulk_done", self._lang, count=str(done_count))
+            )
+            return
+        reasons = "\n".join(f"- {self._explain_result(r)}" for r in failures[:10])
+        if len(failures) > 10:
+            reasons += "\n..."
+        self._QMessageBox.warning(
+            self._window,
+            title,
+            t("gui.info.bulk_partial", self._lang,
+              count=str(done_count), failed=str(len(failures))) + "\n\n" + reasons,
+        )
 
     def archive_all(self) -> None:
         from filesgothere.queue import archive_queue
@@ -1632,41 +1725,118 @@ class MainWindow:
             self._QMessageBox.information(self._window, t("gui.undo", self._lang), t("gui.msg.stop_before_undo", self._lang))
             return
 
-        index = self._selected_history_index()
-        if index is None:
+        indexes = self._history_selected_origs()
+        if not indexes:
             self._QMessageBox.information(self._window, t("gui.undo", self._lang), t("gui.msg.select_row", self._lang))
             return
 
         actions = read_actions(self._done_path, tail=500)
-        if index < 0 or index >= len(actions):
-            return
-        a = actions[index]
-        if a.get("status") != "applied":
+        chosen = [actions[i] for i in indexes if 0 <= i < len(actions)]
+        applicable = [a for a in chosen if a.get("status") == "applied"]
+        if not applicable:
             self._QMessageBox.information(self._window, t("gui.undo", self._lang), t("gui.msg.undo_not_applicable", self._lang))
             return
 
-        text = t(
-            "gui.confirm.undo.text",
-            self._lang,
-            moved=str(a.get("moved_to")),
-            src=str(a.get("src_path")),
-        )
+        if len(applicable) == 1:
+            a = applicable[0]
+            text = t(
+                "gui.confirm.undo.text",
+                self._lang,
+                moved=str(a.get("moved_to")),
+                src=str(a.get("src_path")),
+            )
+        else:
+            text = t("gui.confirm.undo.many", self._lang, count=str(len(applicable)))
+
         answer = self._QMessageBox.question(self._window, t("gui.confirm.undo.title", self._lang), text)
         if answer != self._QMessageBox.StandardButton.Yes:
             return
 
-        result = undo_action(
-            self._done_path,
-            created_at=a.get("created_at"),
-            src_path=a.get("src_path"),
-            applied_at=a.get("applied_at"),
-            moved_to=a.get("moved_to"),
-        )
-        if result.get("undone") is True:
-            self._QMessageBox.information(self._window, t("gui.undo", self._lang), t("gui.info.undone", self._lang))
-        else:
-            self._QMessageBox.warning(self._window, t("gui.undo", self._lang), self._explain_result(result))
+        # Qui l'ordine non conta: undo_action ritrova la riga per firma, non
+        # per posizione, quindi le rimozioni non si disturbano fra loro.
+        undone = 0
+        failures: list[dict] = []
+        for a in applicable:
+            result = undo_action(
+                self._done_path,
+                created_at=a.get("created_at"),
+                src_path=a.get("src_path"),
+                applied_at=a.get("applied_at"),
+                moved_to=a.get("moved_to"),
+            )
+            if result.get("undone") is True:
+                undone += 1
+            else:
+                failures.append(result)
 
+        self._report_bulk(t("gui.undo", self._lang), undone, failures)
+        self.refresh()
+
+    def remove_history_selected(self) -> None:
+        """Toglie dall'elenco le righe selezionate. Nessun file viene toccato."""
+        from filesgothere.queue import delete_done_actions, done_signature
+
+        if self._watcher is not None:
+            self._QMessageBox.information(
+                self._window, t("gui.history.remove", self._lang),
+                t("gui.msg.stop_before_history", self._lang))
+            return
+
+        indexes = self._history_selected_origs()
+        if not indexes:
+            self._QMessageBox.information(
+                self._window, t("gui.history.remove", self._lang),
+                t("gui.msg.select_row", self._lang))
+            return
+
+        actions = read_actions(self._done_path, tail=500)
+        chosen = [actions[i] for i in indexes if 0 <= i < len(actions)]
+        if not chosen:
+            return
+
+        answer = self._QMessageBox.question(
+            self._window,
+            t("gui.history.remove", self._lang),
+            t("gui.confirm.history_remove", self._lang, count=str(len(chosen))),
+        )
+        if answer != self._QMessageBox.StandardButton.Yes:
+            return
+
+        result = delete_done_actions(self._done_path, [done_signature(a) for a in chosen])
+        self._QMessageBox.information(
+            self._window, t("gui.history.remove", self._lang),
+            t("gui.info.history_removed", self._lang, count=str(result.get("removed", 0))))
+        self.refresh()
+
+    def clear_history(self) -> None:
+        """Svuota lo Storico. Nessun file viene toccato."""
+        from filesgothere.queue import clear_done
+
+        if self._watcher is not None:
+            self._QMessageBox.information(
+                self._window, t("gui.history.clear", self._lang),
+                t("gui.msg.stop_before_history", self._lang))
+            return
+
+        total = len(read_actions(self._done_path))
+        if total == 0:
+            self._QMessageBox.information(
+                self._window, t("gui.history.clear", self._lang),
+                t("gui.info.history_empty", self._lang))
+            return
+
+        answer = self._QMessageBox.question(
+            self._window,
+            t("gui.history.clear", self._lang),
+            t("gui.confirm.history_clear", self._lang, count=str(total)),
+        )
+        if answer != self._QMessageBox.StandardButton.Yes:
+            return
+
+        result = clear_done(self._done_path)
+        self._QMessageBox.information(
+            self._window, t("gui.history.clear", self._lang),
+            t("gui.info.history_removed", self._lang, count=str(result.get("removed", 0))))
         self.refresh()
 
     def _refresh_watch_list(self) -> None:
@@ -1943,6 +2113,9 @@ class MainWindow:
             self._QMessageBox.warning(self._window, t("gui.title", self._lang), f"{t('gui.msg.error', self._lang)}: {e}")
 
     def open_source(self) -> None:
+        if self._too_many_selected(t("gui.open_source", self._lang)):
+            return
+
         if self._tabs.currentIndex() == 0:
             index = self._selected_index()
             if index is None:
@@ -1979,6 +2152,9 @@ class MainWindow:
                 self._open_in_explorer(src.parent, select=False)
 
     def open_destination(self) -> None:
+        if self._too_many_selected(t("gui.open_destination", self._lang)):
+            return
+
         if self._tabs.currentIndex() == 0:
             index = self._selected_index()
             if index is None:
