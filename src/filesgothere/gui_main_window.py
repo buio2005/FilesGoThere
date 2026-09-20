@@ -473,7 +473,20 @@ class MainWindow:
         self._refresh_watch_list()
         self.refresh()
 
+    def _default_tab_for_mode(self) -> int:
+        """Scheda su cui aprirsi all'avvio.
+
+        In Automatica la coda "In attesa" resta sempre vuota, perche' i file
+        vengono spostati subito: mostrarla vorrebbe dire accogliere l'utente
+        con una tabella vuota. La scheda utile e' lo Storico.
+        """
+        return self._TAB_HISTORY if self._mode == "auto" else self._TAB_PENDING
+
     def show(self) -> None:
+        try:
+            self._tabs.setCurrentIndex(self._default_tab_for_mode())
+        except Exception:
+            pass
         self._window.show()
         if self._check_updates:
             self._update_checker.start()
@@ -1789,6 +1802,7 @@ class MainWindow:
         """Porta la finestra in primo piano sulla scheda giusta, con la riga
         nuova in cima. Se l'utente sta lavorando nelle Impostazioni non lo si
         sposta: la finestra si alza e basta."""
+        shown_tab = tab_index
         try:
             if self._tabs.currentIndex() != self._TAB_SETTINGS:
                 if self._tabs.currentIndex() != tab_index:
@@ -1799,8 +1813,27 @@ class MainWindow:
                     else self._history_table
                 )
                 table.scrollToTop()
+            else:
+                shown_tab = self._TAB_SETTINGS
         except Exception:
             pass
+
+        # Una riga nel registro: senza, capire perche' la finestra si e'
+        # aperta su una scheda invece che su un'altra resta una questione di
+        # ipotesi.
+        try:
+            names = {
+                self._TAB_PENDING: "gui.tab.pending",
+                self._TAB_HISTORY: "gui.tab.history",
+                self._TAB_SETTINGS: "gui.tab.settings",
+            }
+            self._logger.info(
+                t("event.window.raised", self._lang,
+                  tab=t(names.get(shown_tab, "gui.tab.history"), self._lang))
+            )
+        except Exception:
+            pass
+
         self._bring_to_front()
 
     _KNOWN_REASONS = (
