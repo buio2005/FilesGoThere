@@ -15,11 +15,16 @@ from filesgothere.queue import AutoApplier, QueueWriter
 from filesgothere.rules import RuleEngine
 from filesgothere.utils import has_temp_sibling, is_ignored, is_temporary_download
 
-# Un file da 0 byte non viene considerato pronto: quasi sempre è il segnaposto
-# creato dal browser all'inizio del download. Dopo questa finestra di grazia,
-# se non c'è nessun gemello temporaneo accanto, lo si accetta come file
-# realmente vuoto.
-ZERO_BYTE_GRACE_SECONDS = 30.0
+# Un file da 0 byte non viene MAI considerato pronto.
+#
+# È il segnaposto che il browser crea per prenotare il nome: resta vuoto per
+# tutta la durata del download, che su un file grosso vuol dire minuti. Una
+# soglia di attesa, per quanto generosa, prima o poi viene superata da un
+# download più lento, e il segnaposto finisce spostato al posto del file vero.
+# Non si sposta e basta: si aspetta che diventi il file completo.
+#
+# Il prezzo è che un file legittimamente vuoto non viene organizzato e resta
+# nella cartella di origine.
 
 # Il file può sparire per un istante quando il browser cancella il segnaposto e
 # subito dopo rinomina il ".part" con lo stesso nome: si tollera questa breve
@@ -167,11 +172,13 @@ def _wait_for_settle(
     download grandi/lenti non vengono scartati. max_total_seconds > 0 impone
     un tetto massimo di attesa (0 = nessun limite).
 
-    Non considera mai pronto un segnaposto di download: né un file che ha
-    accanto il gemello ".part"/".crdownload", né (salvo grazia) un file da
-    0 byte."""
+    Non considera mai pronto un segnaposto di download: né un file da 0 byte,
+    né un file che ha accanto il gemello ".part"/".crdownload"."""
     if settle_seconds <= 0:
-        return path.exists() and not has_temp_sibling(path)
+        try:
+            return path.stat().st_size > 0 and not has_temp_sibling(path)
+        except OSError:
+            return False
 
     start = time.time()
     last_size = -1
@@ -208,10 +215,14 @@ def _wait_for_settle(
             time.sleep(0.5)
             continue
 
-        if size == 0 and (time.time() - start) < ZERO_BYTE_GRACE_SECONDS:
+        if size == 0:
+            # Segnaposto: si attende senza scadenza. Quando il browser lo
+            # sostituira' con il file vero la dimensione cambiera' e da li'
+            # riparte il normale conteggio di stabilita'; se invece il
+            # download viene annullato il file sparisce e si esce sopra.
             stable_since = None
             last_size = 0
-            time.sleep(0.3)
+            time.sleep(0.5)
             continue
 
         if size == last_size:
